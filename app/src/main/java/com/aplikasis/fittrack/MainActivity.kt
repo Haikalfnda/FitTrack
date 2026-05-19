@@ -3,45 +3,32 @@ package com.aplikasis.fittrack
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.aplikasis.fittrack.ui.theme.FitTrackTheme
+import androidx.navigation.compose.rememberNavController
+import com.aplikasis.fittrack.navigation.NavGraph
+import com.aplikasis.fittrack.ui.theme.PrimaryBlue
+import com.aplikasis.fittrack.ui.theme.ScreenBg
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         setContent {
-            FitTrackTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+            MaterialTheme(
+                colorScheme = lightColorScheme(
+                    primary = PrimaryBlue,
+                    background = ScreenBg
+                )
+            ) {
+                FitTrackApp()
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    FitTrackTheme {
-        Greeting("Android")
-    }
+fun FitTrackApp() {
+    val navController = rememberNavController()
+    NavGraph(navController = navController)
 }
