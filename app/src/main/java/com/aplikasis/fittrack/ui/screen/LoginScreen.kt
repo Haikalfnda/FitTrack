@@ -1,12 +1,8 @@
 package com.aplikasis.fittrack.ui.screen
 
-
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,160 +11,331 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aplikasis.fittrack.ui.theme.DarkText
-import com.aplikasis.fittrack.ui.theme.MutedText
+import com.aplikasis.fittrack.data.database.FitTrackDatabase
+import com.aplikasis.fittrack.data.entity.UserEntity
 import com.aplikasis.fittrack.ui.theme.PrimaryBlue
 import com.aplikasis.fittrack.ui.theme.ScreenBg
-import com.aplikasis.fittrack.ui.component.AuthTextField
-import com.aplikasis.fittrack.ui.component.AuthTopBar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun LoginScreen(
-    onRegisterClick: () -> Unit
+    onRegisterClick: () -> Unit,
+    onLoginSuccess: (UserEntity) -> Unit
 ) {
-    var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ScreenBg)
-    ) {
-        AuthTopBar(title = "Masuk")
+    val dao = remember {
+        FitTrackDatabase.getDatabase(context).fitTrackDao()
+    }
+
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isAdminMode by remember { mutableStateOf(false) }
+
+    Scaffold(
+        containerColor = ScreenBg
+    ) { paddingValues ->
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+                .background(ScreenBg)
+                .padding(paddingValues)
         ) {
-            Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                text = "Selamat datang kembali",
-                color = DarkText,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Masuk untuk mencatat latihan dan memantau progres.",
-                color = MutedText,
-                fontSize = 13.sp
-            )
-
-            Spacer(modifier = Modifier.height(22.dp))
-
-            AuthTextField(
-                label = "Email",
-                value = email,
-                onValueChange = { email = it },
-                placeholder = "Masukkan email",
-                icon = Icons.Outlined.Email,
-                keyboardType = KeyboardType.Email
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            AuthTextField(
-                label = "Kata Sandi",
-                value = password,
-                onValueChange = { password = it },
-                placeholder = "Masukkan kata sandi",
-                icon = Icons.Outlined.Lock,
-                keyboardType = KeyboardType.Password,
-                isPassword = true
-            )
-
-            Text(
-                text = "Lupa kata sandi?",
-                color = PrimaryBlue,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .padding(top = 6.dp)
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Button(
-                onClick = { },
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(9.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryBlue
-                )
+                    .height(58.dp)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Masuk",
+                    text = if (isAdminMode) "Masuk Admin" else "Masuk",
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
+                    color = Color(0xFF111827)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Divider(color = Color(0xFFE5E7EB))
 
-            OutlinedButton(
-                onClick = { },
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(9.dp),
-                border = BorderStroke(1.dp, PrimaryBlue),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = PrimaryBlue
-                )
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.Start
             ) {
+                Spacer(modifier = Modifier.height(28.dp))
+
                 Text(
-                    text = "Masuk sebagai Admin",
+                    text = if (isAdminMode) {
+                        "Login Admin FitTrack"
+                    } else {
+                        "Selamat datang kembali"
+                    },
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(30.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "Belum punya akun? ",
-                    color = PrimaryBlue.copy(alpha = 0.65f),
-                    fontSize = 13.sp
+                    color = Color(0xFF111827)
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
-                    text = "Daftar",
-                    color = PrimaryBlue,
+                    text = if (isAdminMode) {
+                        "Masukkan email dan kata sandi admin untuk mengelola aplikasi."
+                    } else {
+                        "Masuk untuk mencatat latihan dan memantau progres."
+                    },
+                    fontSize = 14.sp,
+                    color = Color(0xFF7C8BA1)
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                Text(
+                    text = "Email",
                     fontSize = 13.sp,
-                    modifier = Modifier.clickable {
-                        onRegisterClick()
-                    }
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF374151)
                 )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = {
+                        email = it
+                        errorMessage = ""
+                    },
+                    placeholder = {
+                        Text(
+                            text = if (isAdminMode) {
+                                "Masukkan email admin"
+                            } else {
+                                "Masukkan email"
+                            },
+                            color = Color(0xFF9CA3AF)
+                        )
+                    },
+                    leadingIcon = {
+                        Text(text = "✉️")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(58.dp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedIndicatorColor = PrimaryBlue,
+                        unfocusedIndicatorColor = Color(0xFFD1D5DB),
+                        cursorColor = PrimaryBlue
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "Kata Sandi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF374151)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        errorMessage = ""
+                    },
+                    placeholder = {
+                        Text(
+                            text = if (isAdminMode) {
+                                "Masukkan kata sandi admin"
+                            } else {
+                                "Masukkan kata sandi"
+                            },
+                            color = Color(0xFF9CA3AF)
+                        )
+                    },
+                    leadingIcon = {
+                        Text(text = "🔒")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(58.dp),
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    visualTransformation = PasswordVisualTransformation(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedIndicatorColor = PrimaryBlue,
+                        unfocusedIndicatorColor = Color(0xFFD1D5DB),
+                        cursorColor = PrimaryBlue
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                TextButton(
+                    onClick = {
+                        // Fitur lupa password belum dibuat
+                    },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(
+                        text = "Lupa kata sandi?",
+                        color = PrimaryBlue,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+
+                if (errorMessage.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Button(
+                    onClick = {
+                        if (email.isBlank() || password.isBlank()) {
+                            errorMessage = "Email dan kata sandi wajib diisi"
+                        } else {
+                            scope.launch {
+                                val user = withContext(Dispatchers.IO) {
+                                    dao.login(
+                                        email = email.trim(),
+                                        password = password.trim()
+                                    )
+                                }
+
+                                when {
+                                    user == null -> {
+                                        errorMessage = "Email atau kata sandi salah"
+                                    }
+
+                                    user.status.equals("nonaktif", ignoreCase = true) -> {
+                                        errorMessage = "Akun kamu sedang nonaktif"
+                                    }
+
+                                    isAdminMode && user.role != "admin" -> {
+                                        errorMessage = "Akun ini bukan akun admin"
+                                    }
+
+                                    !isAdminMode && user.role == "admin" -> {
+                                        errorMessage = "Silakan gunakan tombol Masuk sebagai Admin"
+                                    }
+
+                                    else -> {
+                                        onLoginSuccess(user)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryBlue
+                    )
+                ) {
+                    Text(
+                        text = if (isAdminMode) "Masuk Admin" else "Masuk",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        isAdminMode = !isAdminMode
+                        email = ""
+                        password = ""
+                        errorMessage = ""
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White,
+                        contentColor = PrimaryBlue
+                    )
+                ) {
+                    Text(
+                        text = if (isAdminMode) {
+                            "Masuk sebagai Pengguna"
+                        } else {
+                            "Masuk sebagai Admin"
+                        },
+                        color = PrimaryBlue,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                TextButton(
+                    onClick = onRegisterClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Belum punya akun? Daftar",
+                        color = PrimaryBlue,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
