@@ -1,11 +1,21 @@
 package com.aplikasis.fittrack.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.aplikasis.fittrack.data.entity.UserEntity
+import com.aplikasis.fittrack.ui.screen.BerandaScreen
+import com.aplikasis.fittrack.ui.screen.ProgramLatihanScreen
+import com.aplikasis.fittrack.ui.screen.DetailProgramScreen
+import com.aplikasis.fittrack.ui.screen.ProgressTrackingScreen
+import com.aplikasis.fittrack.ui.screen.RingkasanSesiScreen
 import com.aplikasis.fittrack.ui.screen.DashboardAdminScreen
 import com.aplikasis.fittrack.ui.screen.DataPenggunaScreen
 import com.aplikasis.fittrack.ui.screen.FormKontenScreen
@@ -18,6 +28,10 @@ import com.aplikasis.fittrack.ui.screen.WelcomeScreen
 
 @Composable
 fun NavGraph(navController: NavHostController) {
+
+    // Simpan user yang sedang login di sini
+    var loggedInUser by remember { mutableStateOf<UserEntity?>(null) }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Welcome.route
@@ -36,17 +50,14 @@ fun NavGraph(navController: NavHostController) {
                     navController.navigate(Screen.Register.route)
                 },
                 onLoginSuccess = { user ->
+                    loggedInUser = user  // simpan user asli di sini
                     if (user.role == "admin") {
                         navController.navigate(Screen.AdminDashboard.route) {
-                            popUpTo(Screen.Login.route) {
-                                inclusive = true
-                            }
+                            popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     } else {
                         navController.navigate(Screen.Personalization.route) {
-                            popUpTo(Screen.Login.route) {
-                                inclusive = true
-                            }
+                            popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     }
                 }
@@ -55,42 +66,89 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Register.route) {
             RegisterScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                onLoginClick = {
-                    navController.popBackStack()
-                }
+                onBackClick = { navController.popBackStack() },
+                onLoginClick = { navController.popBackStack() }
             )
         }
 
         composable(Screen.Personalization.route) {
             PersonalizationScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
+                onBackClick = { navController.popBackStack() },
                 onCreateProgramClick = {
-                    // Nanti lanjut ke dashboard user
+                    navController.navigate(Screen.Beranda.route) {
+                        popUpTo(Screen.Personalization.route) { inclusive = true }
+                    }
                 }
             )
         }
 
+        // ── Beranda User ──────────────────────────────────────────────────────
+        composable(Screen.Beranda.route) {
+            val user = loggedInUser
+            if (user != null) {
+                BerandaScreen(
+                    user = user,
+                    streakHari = 12,
+                    onLanjutLatihan = {
+                        navController.navigate(Screen.ProgramLatihan.route)
+                    }
+                )
+            }
+        }
+
+        // ── Program Latihan ───────────────────────────────────────────────────
+        composable(Screen.ProgramLatihan.route) {
+            ProgramLatihanScreen(
+                onBackClick = { navController.popBackStack() },
+                onMulaiSesi = {
+                    navController.navigate(Screen.DetailProgram.route)
+                }
+            )
+        }
+
+        // ── Detail Program ────────────────────────────────────────────────────
+        composable(Screen.DetailProgram.route) {
+            DetailProgramScreen(
+                onBackClick = { navController.popBackStack() },
+                onSelesaiSesi = {
+                    navController.navigate(Screen.RingkasanSesi.route)
+                }
+            )
+        }
+
+        // ── Ringkasan Sesi ────────────────────────────────────────────────────
+        composable(Screen.RingkasanSesi.route) {
+            RingkasanSesiScreen(
+                onLihatRiwayat = { /* TODO */ },
+                onBukaProgressTracking = {
+                    navController.navigate(Screen.ProgressTracking.route)
+                }
+            )
+        }
+
+        // ── Progress Tracking ─────────────────────────────────────────────────
+        composable(Screen.ProgressTracking.route) {
+            ProgressTrackingScreen(
+                onBerandaClick = {
+                    navController.navigate(Screen.Beranda.route) {
+                        popUpTo(Screen.Beranda.route) { inclusive = false }
+                    }
+                },
+                onRiwayatClick = { /* TODO */ },
+                onVideoClick = { /* TODO */ }
+            )
+        }
+
+        // ── Admin ─────────────────────────────────────────────────────────────
         composable(Screen.AdminDashboard.route) {
             DashboardAdminScreen(
-                onKelolaKontenClick = {
-                    navController.navigate(Screen.KelolaKonten.route)
-                },
-                onKelolaVideoClick = {
-                    navController.navigate(Screen.KelolaVideo.route)
-                },
-                onDataPenggunaClick = {
-                    navController.navigate(Screen.DataPengguna.route)
-                },
+                onKelolaKontenClick = { navController.navigate(Screen.KelolaKonten.route) },
+                onKelolaVideoClick = { navController.navigate(Screen.KelolaVideo.route) },
+                onDataPenggunaClick = { navController.navigate(Screen.DataPengguna.route) },
                 onLogoutClick = {
+                    loggedInUser = null
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.AdminDashboard.route) {
-                            inclusive = true
-                        }
+                        popUpTo(Screen.AdminDashboard.route) { inclusive = true }
                     }
                 }
             )
@@ -98,15 +156,9 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.KelolaKonten.route) {
             KelolaKontenScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                onTambahClick = {
-                    navController.navigate(Screen.FormKonten.createRoute(0L))
-                },
-                onEditClick = { idKonten ->
-                    navController.navigate(Screen.FormKonten.createRoute(idKonten))
-                }
+                onBackClick = { navController.popBackStack() },
+                onTambahClick = { navController.navigate(Screen.FormKonten.createRoute(0L)) },
+                onEditClick = { idKonten -> navController.navigate(Screen.FormKonten.createRoute(idKonten)) }
             )
         }
 
@@ -119,31 +171,19 @@ fun NavGraph(navController: NavHostController) {
                 }
             )
         ) { backStackEntry ->
-
             val idKonten = backStackEntry.arguments?.getLong("idKonten") ?: 0L
-
             FormKontenScreen(
                 idKonten = idKonten,
-                onBackClick = {
-                    navController.popBackStack()
-                }
+                onBackClick = { navController.popBackStack() }
             )
         }
 
         composable(Screen.KelolaVideo.route) {
-            KelolaVideoScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            KelolaVideoScreen(onBackClick = { navController.popBackStack() })
         }
 
         composable(Screen.DataPengguna.route) {
-            DataPenggunaScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            DataPenggunaScreen(onBackClick = { navController.popBackStack() })
         }
     }
 }

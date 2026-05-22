@@ -1,16 +1,8 @@
 package com.aplikasis.fittrack.ui.screen
 
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -18,35 +10,39 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aplikasis.fittrack.ui.theme.DarkText
-import com.aplikasis.fittrack.ui.theme.MutedText
-import com.aplikasis.fittrack.ui.theme.PrimaryBlue
-import com.aplikasis.fittrack.ui.theme.ScreenBg
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aplikasis.fittrack.ui.component.AuthTextField
 import com.aplikasis.fittrack.ui.component.AuthTopBar
+import com.aplikasis.fittrack.ui.theme.*
 
 @Composable
 fun RegisterScreen(
     onBackClick: () -> Unit,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    viewModel: RegisterViewModel = viewModel()
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
+
+    val state by viewModel.state.collectAsState()
+
+    // Kalau register berhasil → langsung ke halaman login
+    LaunchedEffect(state) {
+        if (state is RegisterState.Success) {
+            viewModel.resetState()
+            onLoginClick()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -126,23 +122,42 @@ fun RegisterScreen(
                 isPassword = true
             )
 
+            // Tampilkan pesan error kalau ada
+            if (state is RegisterState.Error) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = (state as RegisterState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 13.sp
+                )
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { },
+                onClick = {
+                    viewModel.register(name, email, password, confirmPassword)
+                },
+                enabled = state !is RegisterState.Loading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(9.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryBlue
-                )
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
             ) {
-                Text(
-                    text = "Daftar",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+                if (state is RegisterState.Loading) {
+                    CircularProgressIndicator(
+                        color = androidx.compose.ui.graphics.Color.White,
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "Daftar",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -156,16 +171,15 @@ fun RegisterScreen(
                     color = PrimaryBlue.copy(alpha = 0.65f),
                     fontSize = 13.sp
                 )
-
                 Text(
                     text = "Masuk",
                     color = PrimaryBlue,
                     fontSize = 13.sp,
-                    modifier = Modifier.clickable {
-                        onLoginClick()
-                    }
+                    modifier = Modifier.clickable { onLoginClick() }
                 )
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

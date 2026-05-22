@@ -6,10 +6,18 @@ sealed class Screen(val route: String) {
     object Register : Screen("register")
     object Personalization : Screen("personalization")
 
+    // ── User screens ──────────────────────────────────────────────────────────
+    object Beranda          : Screen("beranda")
+    object ProgramLatihan   : Screen("program_latihan")
+    object DetailProgram    : Screen("detail_program")
+    object RingkasanSesi    : Screen("ringkasan_sesi")
+    object ProgressTracking : Screen("progress_tracking")
+
+    // ── Admin screens ─────────────────────────────────────────────────────────
     object AdminDashboard : Screen("admin_dashboard")
-    object KelolaKonten : Screen("kelola_konten")
-    object KelolaVideo : Screen("kelola_video")
-    object DataPengguna : Screen("data_pengguna")
+    object KelolaKonten   : Screen("kelola_konten")
+    object KelolaVideo    : Screen("kelola_video")
+    object DataPengguna   : Screen("data_pengguna")
 
     object FormKonten : Screen("form_konten/{idKonten}") {
         fun createRoute(idKonten: Long = 0L): String {
