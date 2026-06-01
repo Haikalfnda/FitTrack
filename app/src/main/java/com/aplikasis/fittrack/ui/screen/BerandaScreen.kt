@@ -13,6 +13,9 @@ import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,7 +30,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.aplikasis.fittrack.data.entity.UserEntity
+import com.aplikasis.fittrack.navigation.Screen
 import com.aplikasis.fittrack.ui.theme.*
 
 // ─── Data dummy (nanti ganti dari ViewModel/DB) ───────────────────────────────
@@ -77,65 +84,117 @@ private val dummyRingkasan = RingkasanCepat(
 @Composable
 fun BerandaScreen(
     user: UserEntity,
+    navController: NavController, // Tambahkan NavController di sini
     streakHari: Int = 12,          // nanti dari DB / ViewModel
     onLanjutLatihan: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(ScreenBg)
-            .verticalScroll(scrollState)
+    Scaffold(
+        containerColor = ScreenBg,
+        bottomBar = {
+            BottomNavigationBar(navController = navController)
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(innerPadding) // Penting: Menghindari konten tertutup oleh bottom navigation bar
+                .verticalScroll(scrollState)
+        ) {
+            // ── Header ──────────────────────────────────────────────────────────
+            HeaderCard(
+                namaUser = user.nama,
+                streakHari = streakHari,
+                hariSelesai = dummyProgram.hariSelesai,
+                hariTarget = dummyProgram.hariTarget,
+                progressMinggu = dummyProgram.progressMinggu
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Program Aktif ────────────────────────────────────────────────────
+            Text(
+                text = "Program Aktif",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = DarkText,
+                    fontSize = 17.sp
+                ),
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ProgramAktifCard(
+                program = dummyProgram,
+                onLanjutLatihan = onLanjutLatihan
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Ringkasan Cepat ──────────────────────────────────────────────────
+            Text(
+                text = "Ringkasan Cepat",
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = DarkText,
+                    fontSize = 17.sp
+                ),
+                modifier = Modifier.padding(horizontal = 20.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            RingkasanCepatRow(ringkasan = dummyRingkasan)
+
+            Spacer(modifier = Modifier.height(28.dp))
+        }
+    }
+}
+
+@Composable
+fun BottomNavigationBar(navController: NavController) {
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    NavigationBar(
+        containerColor = Color.White,
+        tonalElevation = 8.dp
     ) {
-        // ── Header ──────────────────────────────────────────────────────────
-        HeaderCard(
-            namaUser = user.nama,
-            streakHari = streakHari,
-            hariSelesai = dummyProgram.hariSelesai,
-            hariTarget = dummyProgram.hariTarget,
-            progressMinggu = dummyProgram.progressMinggu
+        val items = listOf(
+            Triple("Beranda", Screen.Beranda.route, Icons.Default.Home),
+            Triple("Riwayat", Screen.RiwayatLatihan.route, Icons.Outlined.History),
+            Triple("Progres", Screen.ProgressTracking.route, Icons.Default.ShowChart),
+            Triple("Video", "video_placeholder", Icons.Default.PlayArrow)
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ── Program Aktif ────────────────────────────────────────────────────
-        Text(
-            text = "Program Aktif",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = DarkText,
-                fontSize = 17.sp
-            ),
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        ProgramAktifCard(
-            program = dummyProgram,
-            onLanjutLatihan = onLanjutLatihan
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ── Ringkasan Cepat ──────────────────────────────────────────────────
-        Text(
-            text = "Ringkasan Cepat",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                color = DarkText,
-                fontSize = 17.sp
-            ),
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        RingkasanCepatRow(ringkasan = dummyRingkasan)
-
-        Spacer(modifier = Modifier.height(28.dp))
+        items.forEach { (label, route, icon) ->
+            NavigationBarItem(
+                selected = currentRoute == route,
+                onClick = {
+                    if (currentRoute != route) {
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                icon = { Icon(icon, contentDescription = label) },
+                label = { Text(label, fontSize = 10.sp) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = PrimaryBlue,
+                    selectedTextColor = PrimaryBlue,
+                    indicatorColor = Color(0xFFE8F0FD),
+                    unselectedIconColor = MutedText,
+                    unselectedTextColor = MutedText
+                )
+            )
+        }
     }
 }
 
@@ -553,6 +612,7 @@ fun BerandaScreenPreview() {
                 level = "Pemula",
                 tujuan = "Turun berat badan"
             ),
+            navController = rememberNavController(), // Sediakan mock controller untuk preview
             streakHari = 12
         )
     }

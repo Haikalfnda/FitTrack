@@ -3,9 +3,11 @@ package com.aplikasis.fittrack.data.dao
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.aplikasis.fittrack.data.entity.KontenEntity
+import com.aplikasis.fittrack.data.entity.RiwayatLatihanEntity
 import com.aplikasis.fittrack.data.entity.UserEntity
 import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
 import kotlinx.coroutines.flow.Flow
@@ -69,4 +71,12 @@ interface FitTrackDao {
 
     @Query("SELECT COUNT(*) FROM users WHERE role = 'user' AND status = 'aktif'")
     fun countUserAktif(): Flow<Int>
+
+    // Mengambil data berdasarkan filter secara otomatis & real-time
+    @Query("SELECT * FROM riwayat_latihan WHERE tipeFilter = :filter ORDER BY id DESC")
+    fun getRiwayatByFilter(filter: String): Flow<List<RiwayatLatihanEntity>>
+
+    // Dipanggil di akhir sesi latihan user untuk menyimpan data ke database
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRiwayat(riwayat: RiwayatLatihanEntity)
 }

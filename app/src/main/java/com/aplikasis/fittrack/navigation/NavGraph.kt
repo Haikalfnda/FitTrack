@@ -5,11 +5,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.aplikasis.fittrack.data.database.FitTrackDatabase
 import com.aplikasis.fittrack.data.entity.UserEntity
 import com.aplikasis.fittrack.ui.screen.BerandaScreen
 import com.aplikasis.fittrack.ui.screen.ProgramLatihanScreen
@@ -25,6 +28,9 @@ import com.aplikasis.fittrack.ui.screen.LoginScreen
 import com.aplikasis.fittrack.ui.screen.PersonalizationScreen
 import com.aplikasis.fittrack.ui.screen.RegisterScreen
 import com.aplikasis.fittrack.ui.screen.WelcomeScreen
+import com.aplikasis.fittrack.ui.screen.RiwayatLatihanScreen
+import com.aplikasis.fittrack.ui.screen.RiwayatLatihanViewModel
+import com.aplikasis.fittrack.ui.screen.ViewModelFactory
 
 @Composable
 fun NavGraph(navController: NavHostController) {
@@ -88,6 +94,7 @@ fun NavGraph(navController: NavHostController) {
             if (user != null) {
                 BerandaScreen(
                     user = user,
+                    navController = navController,
                     streakHari = 12,
                     onLanjutLatihan = {
                         navController.navigate(Screen.ProgramLatihan.route)
@@ -119,7 +126,9 @@ fun NavGraph(navController: NavHostController) {
         // ── Ringkasan Sesi ────────────────────────────────────────────────────
         composable(Screen.RingkasanSesi.route) {
             RingkasanSesiScreen(
-                onLihatRiwayat = { /* TODO */ },
+                onLihatRiwayat = {
+                    navController.navigate(Screen.RiwayatLatihan.route)
+                },
                 onBukaProgressTracking = {
                     navController.navigate(Screen.ProgressTracking.route)
                 }
@@ -134,8 +143,30 @@ fun NavGraph(navController: NavHostController) {
                         popUpTo(Screen.Beranda.route) { inclusive = false }
                     }
                 },
-                onRiwayatClick = { /* TODO */ },
+                onRiwayatClick = {
+                    navController.navigate(Screen.RiwayatLatihan.route)
+                },
                 onVideoClick = { /* TODO */ }
+            )
+        }
+        
+        // ── Riwayat Latihan ───────────────────────────────────────────────────
+        composable("riwayat_latihan") {
+            val context = LocalContext.current
+
+            // 1. Ambil instance database & DAO Anda
+            val database = FitTrackDatabase.getDatabase(context) // Menggunakan fungsi singleton DB Anda
+            val dao = database.fitTrackDao() // Sesuaikan dengan nama fungsi return DAO di DB Anda
+
+            // 2. Inisialisasi ViewModel menggunakan Factory kustom
+            val riwayatViewModel: RiwayatLatihanViewModel = viewModel(
+                factory = ViewModelFactory(dao)
+            )
+
+            // 3. Teruskan ke Screen Anda
+            RiwayatLatihanScreen(
+                navController = navController,
+                viewModel = riwayatViewModel
             )
         }
 
