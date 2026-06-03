@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.aplikasis.fittrack.data.dao.FitTrackDao
 import com.aplikasis.fittrack.data.entity.KontenEntity
+import com.aplikasis.fittrack.data.entity.RiwayatLatihanEntity
 import com.aplikasis.fittrack.data.entity.UserEntity
 import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
 
@@ -13,9 +14,10 @@ import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
     entities = [
         UserEntity::class,
         KontenEntity::class,
-        VideoTutorialEntity::class
+        VideoTutorialEntity::class,
+        RiwayatLatihanEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class FitTrackDatabase : RoomDatabase() {
