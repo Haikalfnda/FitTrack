@@ -66,6 +66,17 @@ interface FitTrackDao {
     @Query("SELECT * FROM video_tutorial ORDER BY id_video DESC")
     fun getAllVideo(): Flow<List<VideoTutorialEntity>>
 
+    @Query("""
+    SELECT * FROM video_tutorial
+    WHERE (:kategori = 'Semua' OR kategori = :kategori)
+    ORDER BY id_video DESC""")
+    fun getVideoByKategori(kategori: String): Flow<List<VideoTutorialEntity>>
+
+    @Query("""SELECT * FROM video_tutorial WHERE id_video = :idVideo LIMIT 1""")
+    suspend fun getVideoById(
+        idVideo: Long
+    ): VideoTutorialEntity?
+
     @Query("SELECT COUNT(*) FROM video_tutorial")
     fun countVideo(): Flow<Int>
 

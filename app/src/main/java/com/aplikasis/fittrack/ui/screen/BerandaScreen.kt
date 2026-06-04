@@ -167,9 +167,8 @@ fun BottomNavigationBar(navController: NavController) {
             Triple("Beranda", Screen.Beranda.route, Icons.Default.Home),
             Triple("Riwayat", Screen.RiwayatLatihan.route, Icons.Outlined.History),
             Triple("Progres", Screen.ProgressTracking.route, Icons.Default.ShowChart),
-            Triple("Video", "video_placeholder", Icons.Default.PlayArrow)
+            Triple("Video", Screen.VideoTutorial.route, Icons.Default.PlayArrow)
         )
-
         items.forEach { (label, route, icon) ->
             NavigationBarItem(
                 selected = currentRoute == route,

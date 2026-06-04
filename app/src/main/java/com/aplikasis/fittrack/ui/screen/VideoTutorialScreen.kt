@@ -1,28 +1,47 @@
 package com.aplikasis.fittrack.ui.screen
 
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
+import com.aplikasis.fittrack.utils.YoutubeUtils.getYoutubeThumbnail
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoTutorialScreen(
     viewModel: VideoTutorialViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onVideoClick: (VideoTutorialEntity) -> Unit
 ) {
 
     val daftarVideo by viewModel.daftarVideo.collectAsState()
@@ -100,7 +119,12 @@ fun VideoTutorialScreen(
 
                 items(videoFiltered) { video ->
 
-                    VideoUserCard(video)
+                    VideoUserCard(
+                        video = video,
+                        onClick = {
+                            onVideoClick(video)
+                        }
+                    )
                 }
             }
         }
@@ -108,39 +132,33 @@ fun VideoTutorialScreen(
 }
 @Composable
 private fun VideoUserCard(
-    video: VideoTutorialEntity
+    video: VideoTutorialEntity,
+    onClick: () -> Unit
 ) {
 
-    val context = LocalContext.current
-
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp)
     ) {
 
         Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
         ) {
 
-            Box(
+            AsyncImage(
+                model = getYoutubeThumbnail(video.videoUrl),
+                contentDescription = video.judul,
                 modifier = Modifier
-                    .size(100.dp)
-                    .background(
-                        Color(0xFFEAF1FF),
-                        RoundedCornerShape(16.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "▶",
-                    color = Color(0xFF2563EB),
-                    style = MaterialTheme.typography.headlineLarge
-                )
-            }
+                    .size(
+                        width = 100.dp,
+                        height = 80.dp
+                    )
+                    .clip(RoundedCornerShape(12.dp))
+            )
 
             Spacer(modifier = Modifier.width(16.dp))
 
@@ -149,31 +167,26 @@ private fun VideoUserCard(
             ) {
 
                 Text(
-                    video.judul,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    video.deskripsi
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    "Tonton sekarang",
-                    color = Color(0xFF2563EB),
+                    text = video.judul,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable {
+                    maxLines = 2
+                )
 
-                        val intent = Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse(video.videoUrl)
-                        )
+                Spacer(modifier = Modifier.height(6.dp))
 
-                        context.startActivity(intent)
-                    }
+                Text(
+                    text = "Video Tutorial",
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "Tonton sekarang",
+                    color = Color(0xFF2563EB),
+                    fontWeight = FontWeight.Bold
                 )
             }
         }

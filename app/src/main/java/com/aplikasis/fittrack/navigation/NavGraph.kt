@@ -1,9 +1,9 @@
 package com.aplikasis.fittrack.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -14,23 +14,27 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.aplikasis.fittrack.data.database.FitTrackDatabase
 import com.aplikasis.fittrack.data.entity.UserEntity
+import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
 import com.aplikasis.fittrack.ui.screen.BerandaScreen
-import com.aplikasis.fittrack.ui.screen.ProgramLatihanScreen
-import com.aplikasis.fittrack.ui.screen.DetailProgramScreen
-import com.aplikasis.fittrack.ui.screen.ProgressTrackingScreen
-import com.aplikasis.fittrack.ui.screen.RingkasanSesiScreen
 import com.aplikasis.fittrack.ui.screen.DashboardAdminScreen
 import com.aplikasis.fittrack.ui.screen.DataPenggunaScreen
+import com.aplikasis.fittrack.ui.screen.DetailProgramScreen
 import com.aplikasis.fittrack.ui.screen.FormKontenScreen
 import com.aplikasis.fittrack.ui.screen.KelolaKontenScreen
 import com.aplikasis.fittrack.ui.screen.KelolaVideoScreen
 import com.aplikasis.fittrack.ui.screen.LoginScreen
 import com.aplikasis.fittrack.ui.screen.PersonalizationScreen
+import com.aplikasis.fittrack.ui.screen.ProgramLatihanScreen
+import com.aplikasis.fittrack.ui.screen.ProgressTrackingScreen
 import com.aplikasis.fittrack.ui.screen.RegisterScreen
-import com.aplikasis.fittrack.ui.screen.WelcomeScreen
+import com.aplikasis.fittrack.ui.screen.RingkasanSesiScreen
 import com.aplikasis.fittrack.ui.screen.RiwayatLatihanScreen
 import com.aplikasis.fittrack.ui.screen.RiwayatLatihanViewModel
+import com.aplikasis.fittrack.ui.screen.VideoDetailScreen
+import com.aplikasis.fittrack.ui.screen.VideoTutorialScreen
+import com.aplikasis.fittrack.ui.screen.VideoTutorialViewModel
 import com.aplikasis.fittrack.ui.screen.ViewModelFactory
+import com.aplikasis.fittrack.ui.screen.WelcomeScreen
 
 @Composable
 fun NavGraph(navController: NavHostController) {
@@ -146,7 +150,9 @@ fun NavGraph(navController: NavHostController) {
                 onRiwayatClick = {
                     navController.navigate(Screen.RiwayatLatihan.route)
                 },
-                onVideoClick = { /* TODO */ }
+                onVideoClick = {
+                    navController.navigate(Screen.VideoTutorial.route)
+                }
             )
         }
         
@@ -167,6 +173,81 @@ fun NavGraph(navController: NavHostController) {
             RiwayatLatihanScreen(
                 navController = navController,
                 viewModel = riwayatViewModel
+            )
+        }
+
+        // ── Video Tutorial ────────────────────────────────────────────────────
+        composable(Screen.VideoTutorial.route) {
+
+            val context = LocalContext.current
+
+            val dao = remember {
+                FitTrackDatabase
+                    .getDatabase(context)
+                    .fitTrackDao()
+            }
+
+            val videoViewModel: VideoTutorialViewModel = viewModel(
+                factory = ViewModelFactory(dao)
+            )
+            val video =
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.get<VideoTutorialEntity>("video")
+
+            if (video != null) {
+                VideoDetailScreen(
+                    videoId = videoId,
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+            VideoTutorialScreen(
+                viewModel = videoViewModel,
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onVideoClick = { video ->
+                    navController.currentBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("video", video)
+
+                    navController.navigate(Screen.DetailVideo.route)
+                }
+            )
+        }
+
+        composable(
+            route = "detail_video/{videoId}",
+            arguments = listOf(
+                navArgument("videoId") {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+
+            val context = LocalContext.current
+
+            val dao = remember {
+                FitTrackDatabase
+                    .getDatabase(context)
+                    .fitTrackDao()
+            }
+
+            val videoViewModel: VideoTutorialViewModel = viewModel(
+                factory = ViewModelFactory(dao)
+            )
+
+            val videoId =
+                backStackEntry.arguments?.getLong("videoId") ?: 0L
+
+            VideoDetailScreen(
+                viewModel = videoViewModel,
+                videoId = videoId,
+                onBackClick = {
+                    navController.popBackStack()
+                }
             )
         }
 

@@ -14,6 +14,10 @@ sealed class Screen(val route: String) {
     object ProgressTracking : Screen("progress_tracking")
     object RiwayatLatihan   : Screen("riwayat_latihan")
     object VideoTutorial : Screen("video_tutorial")
+    object DetailVideo : Screen("detail_video/{videoId}") {
+        fun createRoute(videoId: Long) =
+            "detail_video/$videoId"
+    }
 
     // ── Admin screens ─────────────────────────────────────────────────────────
     object AdminDashboard : Screen("admin_dashboard")

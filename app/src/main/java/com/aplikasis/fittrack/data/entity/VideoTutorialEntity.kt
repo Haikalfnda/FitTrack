@@ -15,5 +15,6 @@ data class VideoTutorialEntity(
     val deskripsi: String,
 
     @ColumnInfo(name = "video_url")
-    val videoUrl: String
+    val videoUrl: String,
+
 )
