@@ -14,7 +14,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.aplikasis.fittrack.data.database.FitTrackDatabase
 import com.aplikasis.fittrack.data.entity.UserEntity
-import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
 import com.aplikasis.fittrack.ui.screen.BerandaScreen
 import com.aplikasis.fittrack.ui.screen.DashboardAdminScreen
 import com.aplikasis.fittrack.ui.screen.DataPenggunaScreen
@@ -31,6 +30,7 @@ import com.aplikasis.fittrack.ui.screen.RingkasanSesiScreen
 import com.aplikasis.fittrack.ui.screen.RiwayatLatihanScreen
 import com.aplikasis.fittrack.ui.screen.RiwayatLatihanViewModel
 import com.aplikasis.fittrack.ui.screen.VideoDetailScreen
+import com.aplikasis.fittrack.ui.screen.VideoDetailViewModel
 import com.aplikasis.fittrack.ui.screen.VideoTutorialScreen
 import com.aplikasis.fittrack.ui.screen.VideoTutorialViewModel
 import com.aplikasis.fittrack.ui.screen.ViewModelFactory
@@ -190,36 +190,20 @@ fun NavGraph(navController: NavHostController) {
             val videoViewModel: VideoTutorialViewModel = viewModel(
                 factory = ViewModelFactory(dao)
             )
-            val video =
-                navController.previousBackStackEntry
-                    ?.savedStateHandle
-                    ?.get<VideoTutorialEntity>("video")
 
-            if (video != null) {
-                VideoDetailScreen(
-                    videoId = videoId,
-                    onBackClick = {
-                        navController.popBackStack()
-                    }
-                )
-            }
             VideoTutorialScreen(
                 viewModel = videoViewModel,
                 onBackClick = {
                     navController.popBackStack()
                 },
                 onVideoClick = { video ->
-                    navController.currentBackStackEntry
-                        ?.savedStateHandle
-                        ?.set("video", video)
-
-                    navController.navigate(Screen.DetailVideo.route)
+                    navController.navigate(Screen.DetailVideo.createRoute(video.idVideo))
                 }
             )
         }
 
         composable(
-            route = "detail_video/{videoId}",
+            route = Screen.DetailVideo.route,
             arguments = listOf(
                 navArgument("videoId") {
                     type = NavType.LongType
@@ -235,7 +219,7 @@ fun NavGraph(navController: NavHostController) {
                     .fitTrackDao()
             }
 
-            val videoViewModel: VideoTutorialViewModel = viewModel(
+            val detailViewModel: VideoDetailViewModel = viewModel(
                 factory = ViewModelFactory(dao)
             )
 
@@ -243,7 +227,7 @@ fun NavGraph(navController: NavHostController) {
                 backStackEntry.arguments?.getLong("videoId") ?: 0L
 
             VideoDetailScreen(
-                viewModel = videoViewModel,
+                viewModel = detailViewModel,
                 videoId = videoId,
                 onBackClick = {
                     navController.popBackStack()
