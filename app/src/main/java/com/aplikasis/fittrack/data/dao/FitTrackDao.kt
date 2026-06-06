@@ -90,4 +90,19 @@ interface FitTrackDao {
     // Dipanggil di akhir sesi latihan user untuk menyimpan data ke database
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRiwayat(riwayat: RiwayatLatihanEntity)
+
+    @Query("SELECT * FROM users WHERE id_user = :idUser LIMIT 1")
+    fun getUserById(idUser: Long): Flow<UserEntity?>
+
+    // 2. Menghitung jumlah latihan mingguan yang sudah selesai
+    @Query("SELECT COUNT(*) FROM riwayat_latihan WHERE tipeFilter = 'Mingguan' AND idUser = :idUser")
+    fun countLatihanMingguIni(idUser: Long): Flow<Int>
+
+    // 3. Mengupdate data preferensi program ketika klik "Buat program saya"
+    @Query("""
+        UPDATE users 
+        SET level = :level, tujuan = :tujuan, durasi_latihan = :durasi, target_hari_per_minggu = :targetHari 
+        WHERE id_user = :idUser
+    """)
+    suspend fun updatePersonalisasiUser(idUser: Long, level: String, tujuan: String, durasi: String, targetHari: Int)
 }

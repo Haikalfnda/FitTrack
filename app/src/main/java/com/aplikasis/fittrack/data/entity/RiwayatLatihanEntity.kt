@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "riwayat_latihan")
 data class RiwayatLatihanEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val idUser: Long,
     val namaProgram: String,
     val tanggal: String,    // Format: "16 Apr 2026" atau bisa menggunakan Timestamp Long
     val durasi: String,     // Contoh: "26 menit"

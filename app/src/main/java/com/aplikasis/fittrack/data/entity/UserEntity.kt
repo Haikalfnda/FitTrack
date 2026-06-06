@@ -23,10 +23,18 @@ data class UserEntity(
     @ColumnInfo(name = "tanggal_lahir")
     val tanggalLahir: String = "",
 
+    // Menyimpan pilihan level (Pemula / Menengah / Lanjutan)
     val level: String = "",
+
+    // Menyimpan pilihan tujuan (Turun berat badan / dll)
     val tujuan: String = "",
 
-    val role: String = "user",
+    @ColumnInfo(name = "durasi_latihan")
+    val durasiLatihan: String = "",
 
+    @ColumnInfo(name = "target_hari_per_minggu")
+    val targetHariPerMinggu: Int = 0,
+
+    val role: String = "user",
     val status: String = "aktif"
 )

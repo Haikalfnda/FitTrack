@@ -46,6 +46,9 @@ import com.aplikasis.fittrack.ui.theme.DarkText
 import com.aplikasis.fittrack.ui.theme.MutedText
 import com.aplikasis.fittrack.ui.theme.PrimaryBlue
 import com.aplikasis.fittrack.ui.theme.ScreenBg
+import androidx.compose.runtime.rememberCoroutineScope
+import com.aplikasis.fittrack.data.dao.FitTrackDao
+import kotlinx.coroutines.launch
 
 private val CardBg = Color.White
 
@@ -55,6 +58,8 @@ private enum class OptionType {
 
 @Composable
 fun PersonalizationScreen(
+    fitTrackDao: FitTrackDao, // 1. Tambahkan parameter DAO Anda di sini
+    idUserAktif: Long,        // 2. Tambahkan parameter ID User yang sedang login
     onBackClick: () -> Unit = {},
     onCreateProgramClick: () -> Unit = {}
 ) {
@@ -64,6 +69,8 @@ fun PersonalizationScreen(
     var days by remember { mutableStateOf("3 hari") }
 
     var selectedOption by remember { mutableStateOf<OptionType?>(null) }
+
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -140,7 +147,24 @@ fun PersonalizationScreen(
             Spacer(modifier = Modifier.height(28.dp))
 
             Button(
-                onClick = onCreateProgramClick,
+                onClick = {
+                    // 4. Proses penyimpanan data ke database sebelum navigasi pindah
+                    coroutineScope.launch {
+                        // Mengambil angka saja dari string days (contoh: "3 hari" -> 3)
+                        val targetHariAngka = days.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 0
+
+                        fitTrackDao.updatePersonalisasiUser(
+                            idUser = idUserAktif,
+                            level = level,
+                            tujuan = goal,
+                            durasi = duration,
+                            targetHari = targetHariAngka
+                        )
+
+                        // Jalankan aksi navigasi bawaan Anda untuk pindah ke BerandaScreen
+                        onCreateProgramClick()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -515,12 +539,24 @@ private fun getProgramList(goal: String): List<String> {
 )
 @Composable
 fun PersonalizationScreenPreview() {
+    // Membuat instance context dummy untuk keperluan preview saja
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Membuat database instan di memori agar preview tidak error
+    val dbDummy = androidx.room.Room.inMemoryDatabaseBuilder(
+        context,
+        com.aplikasis.fittrack.data.database.FitTrackDatabase::class.java
+    ).build()
+
     MaterialTheme(
         colorScheme = lightColorScheme(
             primary = PrimaryBlue,
             background = ScreenBg
         )
     ) {
-        PersonalizationScreen()
+        PersonalizationScreen(
+            fitTrackDao = dbDummy.fitTrackDao(),
+            idUserAktif = 1L
+        )
     }
 }

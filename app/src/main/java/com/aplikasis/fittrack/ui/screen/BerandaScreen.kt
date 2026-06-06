@@ -33,44 +33,16 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.aplikasis.fittrack.data.dao.FitTrackDao
 import com.aplikasis.fittrack.data.entity.UserEntity
 import com.aplikasis.fittrack.navigation.Screen
 import com.aplikasis.fittrack.ui.theme.*
 
-// ─── Data dummy (nanti ganti dari ViewModel/DB) ───────────────────────────────
-
-private data class ProgramAktif(
-    val nama: String,
-    val frekuensi: String,
-    val tipe: String,
-    val progressMinggu: Int,       // persen 0-100
-    val mingguSaatIni: Int,
-    val totalMinggu: Int,
-    val hariTarget: Int,
-    val hariSelesai: Int,
-    val level: String,
-    val tujuan: String,
-    val nextProgression: String
-)
-
+// ─── Data Model Ringkasan Cepat ───────────────────────────────────────────────
 private data class RingkasanCepat(
     val totalReps: Int,
     val kalori: Int,
     val durasiJam: Double
-)
-
-private val dummyProgram = ProgramAktif(
-    nama = "Full Body Beginner",
-    frekuensi = "4 minggu • 2x per minggu • Personal",
-    tipe = "Hari ini: Push up + Squat + Plank",
-    progressMinggu = 72,
-    mingguSaatIni = 3,
-    totalMinggu = 4,
-    hariTarget = 4,
-    hariSelesai = 3,
-    level = "Level Pemula",
-    tujuan = "Goal: Turun berat badan",
-    nextProgression = "+2 reps"
 )
 
 private val dummyRingkasan = RingkasanCepat(
@@ -83,13 +55,31 @@ private val dummyRingkasan = RingkasanCepat(
 
 @Composable
 fun BerandaScreen(
+    fitTrackDao: FitTrackDao,      // Parameter Baru untuk akses DB
+    idUserAktif: Long,             // Parameter Baru untuk identifikasi User
     user: UserEntity,
-    navController: NavController, // Tambahkan NavController di sini
-    streakHari: Int = 12,          // nanti dari DB / ViewModel
+    navController: NavController,
+    streakHari: Int = 12,
     onLanjutLatihan: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+
+    // 1. Mengamati data user & jumlah latihan riwayat mingguan secara real-time dari Room
+    val userLiveState by fitTrackDao.getUserById(idUserAktif).collectAsState(initial = user)
+    val hariSelesaiDb by fitTrackDao.countLatihanMingguIni(idUserAktif).collectAsState(initial = 0)
+
+    // 2. Gunakan data objek live state dari database
+    val currentUser = userLiveState ?: user
+    val hariTargetDb = currentUser.targetHariPerMinggu
+
+    // 3. Hitung persentase progres mingguan secara dinamis & kunci maksimal di angka 100
+    val progressMingguDb = if (hariTargetDb > 0) {
+        val hitungPersen = (hariSelesaiDb.toFloat() / hariTargetDb.toFloat() * 100).toInt()
+        hitungPersen.coerceAtMost(100) // Memastikan nilai teks tidak melampaui 100%
+    } else {
+        0
+    }
 
     Scaffold(
         containerColor = ScreenBg,
@@ -100,16 +90,16 @@ fun BerandaScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .padding(innerPadding) // Penting: Menghindari konten tertutup oleh bottom navigation bar
+                .padding(innerPadding)
                 .verticalScroll(scrollState)
         ) {
-            // ── Header ──────────────────────────────────────────────────────────
+            // ── Header (Menggunakan Data Ril DB) ──────────────────────────────────
             HeaderCard(
-                namaUser = user.nama,
+                namaUser = currentUser.nama,
                 streakHari = streakHari,
-                hariSelesai = dummyProgram.hariSelesai,
-                hariTarget = dummyProgram.hariTarget,
-                progressMinggu = dummyProgram.progressMinggu
+                hariSelesai = hariSelesaiDb, // Tetap biarkan menampilkan angka asli (contoh: Target 4/3)
+                hariTarget = hariTargetDb,
+                progressMinggu = progressMingguDb
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -127,8 +117,15 @@ fun BerandaScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Mengoper variabel real database ke dalam card program aktif
             ProgramAktifCard(
-                program = dummyProgram,
+                namaProgram = "Full Body Beginner",
+                frekuensi = "4 minggu • ${hariTargetDb}x per minggu • Personal",
+                tipeLatihan = "Hari ini: Push up + Squat + Plank",
+                progressMinggu = progressMingguDb,
+                levelLabel = if (currentUser.level.isNotEmpty()) currentUser.level else "Level Pemula",
+                tujuanLabel = if (currentUser.tujuan.isNotEmpty()) "Goal: ${currentUser.tujuan}" else "Goal: Turun berat badan",
+                nextProgression = "+2 reps",
                 onLanjutLatihan = onLanjutLatihan
             )
 
@@ -213,7 +210,11 @@ private fun HeaderCard(
         animationSpec = tween(durationMillis = 800),
         label = "progress"
     )
-    LaunchedEffect(Unit) { animatedProgress = progressMinggu / 100f }
+
+    // Trigger animasi bar setiap ada perubahan data persen progres
+    LaunchedEffect(progressMinggu) {
+        animatedProgress = if (progressMinggu > 0) (progressMinggu / 100f).coerceAtMost(1f) else 0f
+    }
 
     Box(
         modifier = Modifier
@@ -228,7 +229,6 @@ private fun HeaderCard(
             .padding(20.dp)
     ) {
         Column {
-            // Salam + streak
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -236,7 +236,7 @@ private fun HeaderCard(
             ) {
                 Column {
                     Text(
-                        text = "Halo, ${namaUser.split(" ").first()} 👋",
+                        text = "Halo, ${namaUser.split(" ").firstOrNull() ?: "User"} 👋",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -259,7 +259,6 @@ private fun HeaderCard(
                     )
                 }
 
-                // Streak badge
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
@@ -296,7 +295,6 @@ private fun HeaderCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Progress bar + target
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -310,7 +308,7 @@ private fun HeaderCard(
                     )
                 )
                 Text(
-                    text = "${progressMinggu}%",
+                    text = "$progressMinggu%",
                     style = MaterialTheme.typography.labelMedium.copy(
                         color = Color.White,
                         fontWeight = FontWeight.Bold
@@ -344,7 +342,13 @@ private fun HeaderCard(
 
 @Composable
 private fun ProgramAktifCard(
-    program: ProgramAktif,
+    namaProgram: String,
+    frekuensi: String,
+    tipeLatihan: String,
+    progressMinggu: Int,
+    levelLabel: String,
+    tujuanLabel: String,
+    nextProgression: String,
     onLanjutLatihan: () -> Unit
 ) {
     Card(
@@ -356,16 +360,15 @@ private fun ProgramAktifCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            // Nama program
             Text(
-                text = program.nama,
+                text = namaProgram,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     color = DarkText
                 )
             )
             Text(
-                text = program.frekuensi,
+                text = frekuensi,
                 style = MaterialTheme.typography.bodySmall.copy(color = MutedText),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -373,7 +376,6 @@ private fun ProgramAktifCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Progress minggu
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -384,7 +386,7 @@ private fun ProgramAktifCard(
                     style = MaterialTheme.typography.bodySmall.copy(color = MutedText)
                 )
                 Text(
-                    text = "${program.progressMinggu}%",
+                    text = "$progressMinggu%",
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = PrimaryBlue
@@ -393,7 +395,7 @@ private fun ProgramAktifCard(
             }
             Spacer(modifier = Modifier.height(6.dp))
             LinearProgressIndicator(
-                progress = { program.progressMinggu / 100f },
+                progress = { if (progressMinggu > 0) (progressMinggu / 100f).coerceAtMost(1f) else 0f },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
@@ -415,7 +417,6 @@ private fun ProgramAktifCard(
             HorizontalDivider(color = BorderColor)
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Hari ini
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -433,7 +434,7 @@ private fun ProgramAktifCard(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = program.tipe,
+                    text = tipeLatihan,
                     style = MaterialTheme.typography.bodySmall.copy(color = DarkText),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -442,22 +443,20 @@ private fun ProgramAktifCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Level & Tujuan
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChipLabel(text = program.level, color = Color(0xFF6D79FF))
-                ChipLabel(text = program.tujuan, color = Color(0xFF24C6C2))
+                ChipLabel(text = levelLabel, color = Color(0xFF6D79FF))
+                ChipLabel(text = tujuanLabel, color = Color(0xFF24C6C2))
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Next progression + Lanjut
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Next progression: ${program.nextProgression}",
+                    text = "Next progression: $nextProgression",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = MutedText,
                         fontSize = 11.sp
@@ -575,8 +574,6 @@ private fun StatCard(
     }
 }
 
-// ─── Helper Composables ───────────────────────────────────────────────────────
-
 @Composable
 private fun ChipLabel(text: String, color: Color) {
     Box(
@@ -601,17 +598,26 @@ private fun ChipLabel(text: String, color: Color) {
 @Preview(showBackground = true, backgroundColor = 0xFFF8FAFD)
 @Composable
 fun BerandaScreenPreview() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val dbDummy = androidx.room.Room.inMemoryDatabaseBuilder(
+        context,
+        com.aplikasis.fittrack.data.database.FitTrackDatabase::class.java
+    ).build()
+
     FitrackTheme {
         BerandaScreen(
+            fitTrackDao = dbDummy.fitTrackDao(),
+            idUserAktif = 1L,
             user = UserEntity(
                 idUser = 1,
                 nama = "Fabio Santoso",
                 email = "fabio@email.com",
                 password = "",
                 level = "Pemula",
-                tujuan = "Turun berat badan"
+                tujuan = "Turun berat badan",
+                targetHariPerMinggu = 3
             ),
-            navController = rememberNavController(), // Sediakan mock controller untuk preview
+            navController = rememberNavController(),
             streakHari = 12
         )
     }

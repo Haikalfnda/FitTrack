@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -13,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.aplikasis.fittrack.data.database.FitTrackDatabase
+import com.aplikasis.fittrack.data.entity.RiwayatLatihanEntity
 import com.aplikasis.fittrack.data.entity.UserEntity
 import com.aplikasis.fittrack.ui.screen.BerandaScreen
 import com.aplikasis.fittrack.ui.screen.DashboardAdminScreen
@@ -35,12 +37,16 @@ import com.aplikasis.fittrack.ui.screen.VideoTutorialScreen
 import com.aplikasis.fittrack.ui.screen.VideoTutorialViewModel
 import com.aplikasis.fittrack.ui.screen.ViewModelFactory
 import com.aplikasis.fittrack.ui.screen.WelcomeScreen
+import kotlinx.coroutines.launch
 
 @Composable
 fun NavGraph(navController: NavHostController) {
 
     // Simpan user yang sedang login di sini
     var loggedInUser by remember { mutableStateOf<UserEntity?>(null) }
+
+    // Coroutine scope untuk menjalankan penulisan data ke Room secara asynchronous
+    val coroutineScope = rememberCoroutineScope()
 
     NavHost(
         navController = navController,
@@ -82,7 +88,18 @@ fun NavGraph(navController: NavHostController) {
         }
 
         composable(Screen.Personalization.route) {
+            val context = LocalContext.current
+
+            // Mengambil instance database dan DAO
+            val database = FitTrackDatabase.getDatabase(context)
+            val dao = database.fitTrackDao()
+
+            // Mendapatkan ID dari user aktif saat ini
+            val idUserAktif = loggedInUser?.idUser ?: 0L
+
             PersonalizationScreen(
+                fitTrackDao = dao,
+                idUserAktif = idUserAktif,
                 onBackClick = { navController.popBackStack() },
                 onCreateProgramClick = {
                     navController.navigate(Screen.Beranda.route) {
@@ -96,7 +113,12 @@ fun NavGraph(navController: NavHostController) {
         composable(Screen.Beranda.route) {
             val user = loggedInUser
             if (user != null) {
+                val context = LocalContext.current
+                val dao = FitTrackDatabase.getDatabase(context).fitTrackDao()
+
                 BerandaScreen(
+                    fitTrackDao = dao,
+                    idUserAktif = user.idUser,
                     user = user,
                     navController = navController,
                     streakHari = 12,
@@ -119,10 +141,32 @@ fun NavGraph(navController: NavHostController) {
 
         // ── Detail Program ────────────────────────────────────────────────────
         composable(Screen.DetailProgram.route) {
+            val context = LocalContext.current
+
             DetailProgramScreen(
                 onBackClick = { navController.popBackStack() },
                 onSelesaiSesi = {
-                    navController.navigate(Screen.RingkasanSesi.route)
+                    // Memicu penambahan data riwayat latihan riil ke Room Database
+                    coroutineScope.launch {
+                        val database = FitTrackDatabase.getDatabase(context)
+                        val dao = database.fitTrackDao()
+
+                        dao.insertRiwayat(
+                            RiwayatLatihanEntity(
+                                idUser = loggedInUser?.idUser ?: 0L,
+                                namaProgram = "Full Body Beginner",
+                                tanggal = "06 Jun 2026", // Data dinamis tanggal hari ini
+                                durasi = "25 menit",
+                                reps = "120 reps",
+                                kalori = "250 kcal",
+                                detail = "Sesi latihan mingguan berhasil diselesaikan.",
+                                tipeFilter = "Mingguan" // Kunci agar query COUNT(*) di Beranda mendeteksi latihan ini
+                            )
+                        )
+
+                        // Berpindah ke Halaman Ringkasan setelah data berhasil disimpan
+                        navController.navigate(Screen.RingkasanSesi.route)
+                    }
                 }
             )
         }
@@ -155,14 +199,14 @@ fun NavGraph(navController: NavHostController) {
                 }
             )
         }
-        
+
         // ── Riwayat Latihan ───────────────────────────────────────────────────
         composable("riwayat_latihan") {
             val context = LocalContext.current
 
             // 1. Ambil instance database & DAO Anda
-            val database = FitTrackDatabase.getDatabase(context) // Menggunakan fungsi singleton DB Anda
-            val dao = database.fitTrackDao() // Sesuaikan dengan nama fungsi return DAO di DB Anda
+            val database = FitTrackDatabase.getDatabase(context)
+            val dao = database.fitTrackDao()
 
             // 2. Inisialisasi ViewModel menggunakan Factory kustom
             val riwayatViewModel: RiwayatLatihanViewModel = viewModel(

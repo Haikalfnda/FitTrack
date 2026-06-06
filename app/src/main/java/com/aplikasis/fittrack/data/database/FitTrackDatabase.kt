@@ -17,7 +17,7 @@ import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
         VideoTutorialEntity::class,
         RiwayatLatihanEntity::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = false
 )
 abstract class FitTrackDatabase : RoomDatabase() {
