@@ -105,4 +105,7 @@ interface FitTrackDao {
         WHERE id_user = :idUser
     """)
     suspend fun updatePersonalisasiUser(idUser: Long, level: String, tujuan: String, durasi: String, targetHari: Int)
+
+    @Query("DELETE FROM riwayat_latihan WHERE idUser = :idUser AND tipeFilter = 'Mingguan'")
+    suspend fun deleteRiwayatMingguanUser(idUser: Long)
 }

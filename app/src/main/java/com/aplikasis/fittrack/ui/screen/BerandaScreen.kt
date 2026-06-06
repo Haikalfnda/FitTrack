@@ -124,9 +124,10 @@ fun BerandaScreen(
                 tipeLatihan = "Hari ini: Push up + Squat + Plank",
                 progressMinggu = progressMingguDb,
                 levelLabel = if (currentUser.level.isNotEmpty()) currentUser.level else "Level Pemula",
-                tujuanLabel = if (currentUser.tujuan.isNotEmpty()) "Goal: ${currentUser.tujuan}" else "Goal: Turun berat badan",
+                tujuanLabel = if (currentUser.tujuan.isNotEmpty()) "Goal: ${currentUser.tujuan}" else "Goal: Turun berat balance",
                 nextProgression = "+2 reps",
-                onLanjutLatihan = onLanjutLatihan
+                onLanjutLatihan = onLanjutLatihan,
+                navController = navController
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -349,7 +350,8 @@ private fun ProgramAktifCard(
     levelLabel: String,
     tujuanLabel: String,
     nextProgression: String,
-    onLanjutLatihan: () -> Unit
+    onLanjutLatihan: () -> Unit,
+    navController: NavController // Perbaikan 1: Tipe data ditulis secara eksplisit
 ) {
     Card(
         modifier = Modifier
@@ -389,7 +391,7 @@ private fun ProgramAktifCard(
                     text = "$progressMinggu%",
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryBlue
+                        color = if (progressMinggu >= 100) Color(0xFF27A844) else PrimaryBlue
                     )
                 )
             }
@@ -400,7 +402,7 @@ private fun ProgramAktifCard(
                     .fillMaxWidth()
                     .height(6.dp)
                     .clip(RoundedCornerShape(3.dp)),
-                color = PrimaryBlue,
+                color = if (progressMinggu >= 100) Color(0xFF27A844) else PrimaryBlue,
                 trackColor = BorderColor,
                 strokeCap = StrokeCap.Round
             )
@@ -462,10 +464,22 @@ private fun ProgramAktifCard(
                         fontSize = 11.sp
                     )
                 )
+
+                // Mengatur sifat klik tombol secara dinamis berdasarkan nilai progress
                 Button(
-                    onClick = onLanjutLatihan,
+                    onClick = {
+                        if (progressMinggu >= 100) {
+                            navController.navigate(Screen.Personalization.route) {
+                                popUpTo(Screen.Beranda.route) { inclusive = false }
+                            }
+                        } else {
+                            onLanjutLatihan()
+                        }
+                    },
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (progressMinggu >= 100) Color(0xFF27A844) else PrimaryBlue
+                    ),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
                 ) {
                     Icon(
@@ -475,7 +489,7 @@ private fun ProgramAktifCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Lanjut latihan",
+                        text = if (progressMinggu >= 100) "Latihan Baru" else "Lanjut latihan",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -489,7 +503,9 @@ private fun ProgramAktifCard(
 // ─── Ringkasan Cepat ──────────────────────────────────────────────────────────
 
 @Composable
-private fun RingkasanCepatRow(ringkasan: RingkasanCepat) {
+private fun RingkasanCepatRow(
+    ringkasan: RingkasanCepat = dummyRingkasan // Perbaikan 2: Deklarasi parameter default yang valid
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

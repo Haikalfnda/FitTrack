@@ -148,11 +148,15 @@ fun PersonalizationScreen(
 
             Button(
                 onClick = {
-                    // 4. Proses penyimpanan data ke database sebelum navigasi pindah
+                    // Proses penyimpanan data ke database sebelum navigasi pindah
                     coroutineScope.launch {
                         // Mengambil angka saja dari string days (contoh: "3 hari" -> 3)
                         val targetHariAngka = days.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 0
 
+                        // 1. KUNCI UTAMA: Reset riwayat latihan mingguan yang lama dari database lokal
+                        fitTrackDao.deleteRiwayatMingguanUser(idUserAktif)
+
+                        // 2. Perbarui data preferensi program baru milik user
                         fitTrackDao.updatePersonalisasiUser(
                             idUser = idUserAktif,
                             level = level,
