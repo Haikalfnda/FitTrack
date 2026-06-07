@@ -19,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -43,6 +44,7 @@ fun DashboardAdminScreen(
     val jumlahUserAktif by viewModel.jumlahUserAktif.collectAsState()
     val jumlahKonten by viewModel.jumlahKonten.collectAsState()
     val jumlahVideo by viewModel.jumlahVideo.collectAsState()
+    val jumlahUserPending by viewModel.jumlahUserPending.collectAsState()
 
     Scaffold(
         topBar = {
@@ -105,6 +107,7 @@ fun DashboardAdminScreen(
                 icon = "👥",
                 title = "Data Pengguna",
                 subtitle = "Lihat dan ubah akun pengguna",
+                badge = if (jumlahUserPending > 0) "$jumlahUserPending pending" else null,
                 onClick = onDataPenggunaClick
             )
 
@@ -128,6 +131,13 @@ fun DashboardAdminScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(text = "• $jumlahUserAktif pengguna aktif")
+                    if (jumlahUserPending > 0) {
+                        Text(
+                            text = "• $jumlahUserPending pendaftaran baru",
+                            color = Color(0xFFD97706),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                     Text(text = "• $jumlahVideo video tutorial")
                     Text(text = "• $jumlahKonten konten/artikel/panduan")
                 }
@@ -159,6 +169,7 @@ private fun AdminMenuCard(
     icon: String,
     title: String,
     subtitle: String,
+    badge: String? = null,
     onClick: () -> Unit
 ) {
     Card(
@@ -175,16 +186,37 @@ private fun AdminMenuCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(
-                        color = Color(0xFFEAF1FF),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
             ) {
-                Text(text = icon)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(
+                            color = Color(0xFFEAF1FF),
+                            shape = RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = icon)
+                }
+
+                if (badge != null) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFFEBEE)
+                    ) {
+                        Text(
+                            text = badge,
+                            color = Color(0xFFE53935),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

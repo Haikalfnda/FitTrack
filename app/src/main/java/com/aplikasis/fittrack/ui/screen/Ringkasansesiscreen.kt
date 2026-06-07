@@ -20,25 +20,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aplikasis.fittrack.model.DetailGerakan
+import com.aplikasis.fittrack.model.HasilSesi
 import com.aplikasis.fittrack.ui.theme.*
-
-// ─── Data dummy ───────────────────────────────────────────────────────────────
-
-private data class RingkasanSesiData(
-    val totalReps: Int,
-    val durasi: String,
-    val kaloriTerbakar: Int,
-    val targetHarian: Boolean,
-    val streakStatus: Boolean
-)
-
-private val dummyRingkasan = RingkasanSesiData(
-    totalReps = 95,
-    durasi = "26 mnt",
-    kaloriTerbakar = 120,
-    targetHarian = true,
-    streakStatus = true
-)
 
 private val yangTersimpan = listOf(
     "Tanggal & jenis latihan",
@@ -49,14 +33,21 @@ private val yangTersimpan = listOf(
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+/**
+ * FITUR 5 - Perubahan RingkasanSesiScreen:
+ * - Parameter [hasilSesi] menggantikan data dummy.
+ * - Menampilkan detail per gerakan: nama, rep selesai/target, kalori.
+ * - Total reps & kalori dari data real sesi.
+ * - [hasilSesi] bisa null (fallback ke tampilan default jika dipanggil
+ *   dari tempat lain tanpa data sesi).
+ */
 @Composable
 fun RingkasanSesiScreen(
+    hasilSesi: HasilSesi? = null,
     onLihatRiwayat: () -> Unit = {},
     onBukaProgressTracking: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val data = dummyRingkasan
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -65,7 +56,6 @@ fun RingkasanSesiScreen(
     ) {
         Spacer(modifier = Modifier.height(32.dp))
 
-        // ── Banner Selesai ────────────────────────────────────────────────────
         BannerSelesai()
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -77,12 +67,85 @@ fun RingkasanSesiScreen(
                 .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            MiniStatCard(label = "Reps", value = "${data.totalReps}", modifier = Modifier.weight(1f))
-            MiniStatCard(label = "Durasi", value = data.durasi, modifier = Modifier.weight(1f))
-            MiniStatCard(label = "Kalori", value = "${data.kaloriTerbakar}", modifier = Modifier.weight(1f))
+            MiniStatCard(
+                label = "Reps",
+                value = "${hasilSesi?.totalRep ?: 0}",
+                modifier = Modifier.weight(1f)
+            )
+            MiniStatCard(
+                label = "Kalori",
+                value = "%.1f".format(hasilSesi?.totalKalori ?: 0.0),
+                modifier = Modifier.weight(1f)
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // ── FITUR 5: Detail Per Gerakan ───────────────────────────────────────
+        if (hasilSesi != null && hasilSesi.detailGerakan.isNotEmpty()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "Workout Summary",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = DarkText,
+                            fontSize = 15.sp
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    hasilSesi.detailGerakan.forEach { detail ->
+                        GerakanRingkasanRow(detail = detail)
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
+
+                    HorizontalDivider(color = BorderColor)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Total baris
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Total",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = DarkText
+                            )
+                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${hasilSesi.totalRep} rep",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = DarkText
+                                )
+                            )
+                            Text(
+                                text = "%.2f kcal".format(hasilSesi.totalKalori),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color(0xFFEF4444),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         // ── Yang Tersimpan ────────────────────────────────────────────────────
         Card(
@@ -153,16 +216,14 @@ fun RingkasanSesiScreen(
                     Text(
                         text = "Lihat riwayat latihan",
                         style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = DarkText
+                            fontWeight = FontWeight.Bold, color = DarkText
                         )
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Lihat sesi latihan dan catatan\nlatihan sebelumnya.",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = MutedText,
-                            lineHeight = 17.sp
+                            color = MutedText, lineHeight = 17.sp
                         )
                     )
                 }
@@ -170,8 +231,7 @@ fun RingkasanSesiScreen(
                     Text(
                         text = "Next",
                         style = MaterialTheme.typography.labelMedium.copy(
-                            color = PrimaryBlue,
-                            fontWeight = FontWeight.Bold
+                            color = PrimaryBlue, fontWeight = FontWeight.Bold
                         )
                     )
                 }
@@ -200,16 +260,14 @@ fun RingkasanSesiScreen(
                     Text(
                         text = "Lanjut cek progress",
                         style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = DarkText
+                            fontWeight = FontWeight.Bold, color = DarkText
                         )
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "User bisa langsung melihat\ntren mingguan, kenaikan.",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = MutedText,
-                            lineHeight = 17.sp
+                            color = MutedText, lineHeight = 17.sp
                         )
                     )
                 }
@@ -217,8 +275,7 @@ fun RingkasanSesiScreen(
                     Text(
                         text = "Next",
                         style = MaterialTheme.typography.labelMedium.copy(
-                            color = PrimaryBlue,
-                            fontWeight = FontWeight.Bold
+                            color = PrimaryBlue, fontWeight = FontWeight.Bold
                         )
                     )
                 }
@@ -227,7 +284,6 @@ fun RingkasanSesiScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // ── Tombol Progress Tracking ──────────────────────────────────────────
         Button(
             onClick = onBukaProgressTracking,
             modifier = Modifier
@@ -240,13 +296,62 @@ fun RingkasanSesiScreen(
             Text(
                 text = "Buka progress tracking",
                 style = MaterialTheme.typography.titleSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    fontWeight = FontWeight.Bold, color = Color.White
                 )
             )
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+// ─── Gerakan Ringkasan Row ────────────────────────────────────────────────────
+
+@Composable
+private fun GerakanRingkasanRow(detail: DetailGerakan) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = detail.nama,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = DarkText
+                )
+            )
+            Text(
+                text = "${detail.repSelesai} / ${detail.repTarget} rep",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = MutedText,
+                    fontSize = 11.sp
+                )
+            )
+        }
+
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = detail.kaloriLabel,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = Color(0xFFEF4444),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            )
+            // Badge selesai/tidak
+            if (detail.repSelesai >= detail.repTarget) {
+                Text(
+                    text = "✓ Target",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color(0xFF22C55E),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
     }
 }
 
@@ -266,7 +371,8 @@ private fun BannerSelesai() {
             )
             .padding(20.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
@@ -351,6 +457,16 @@ private fun MiniStatCard(label: String, value: String, modifier: Modifier = Modi
 @Composable
 fun RingkasanSesiScreenPreview() {
     FitrackTheme {
-        RingkasanSesiScreen()
+        RingkasanSesiScreen(
+            hasilSesi = HasilSesi(
+                totalRep = 47,
+                totalKalori = 14.95,
+                detailGerakan = listOf(
+                    DetailGerakan("Push Up", 12, 36, 4.8),
+                    DetailGerakan("Shoulder Tap", 20, 30, 3.6),
+                    DetailGerakan("Plank", 15, 45, 1.5)
+                )
+            )
+        )
     }
 }

@@ -24,7 +24,6 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
     val state: StateFlow<RegisterState> = _state
 
     fun register(nama: String, email: String, password: String, confirmPassword: String) {
-        // Validasi input
         if (nama.isBlank() || email.isBlank() || password.isBlank()) {
             _state.value = RegisterState.Error("Semua field harus diisi.")
             return
@@ -50,12 +49,14 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
                     email = email.trim().lowercase(),
                     password = password,
                     role = "user",
-                    status = "aktif"
+                    // FITUR 2: Status awal adalah "pending", bukan "aktif"
+                    // User tidak bisa login sampai admin approve
+                    status = "pending",
+                    isPersonalized = false
                 )
                 dao.insertUser(user)
                 _state.value = RegisterState.Success
             } catch (e: Exception) {
-                // Kemungkinan email sudah terdaftar (unique constraint)
                 _state.value = RegisterState.Error("Email sudah terdaftar. Gunakan email lain.")
             }
         }

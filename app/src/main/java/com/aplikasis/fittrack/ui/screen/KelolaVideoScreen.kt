@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
+import com.aplikasis.fittrack.utils.YoutubeUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -276,15 +277,21 @@ private fun VideoDialog(
                 OutlinedTextField(
                     value = videoUrl,
                     onValueChange = { videoUrl = it },
-                    label = { Text("URL video") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("URL video (YouTube)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = videoUrl.isNotBlank() && !YoutubeUtils.isYoutubeUrl(videoUrl),
+                    supportingText = {
+                        if (videoUrl.isNotBlank() && !YoutubeUtils.isYoutubeUrl(videoUrl)) {
+                            Text(text = "Bukan URL YouTube yang valid")
+                        }
+                    }
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (judul.isNotBlank() && kategori.isNotBlank()) {
+                    if (judul.isNotBlank() && kategori.isNotBlank() && YoutubeUtils.isYoutubeUrl(videoUrl)) {
                         onSave(
                             VideoTutorialEntity(
                                 idVideo = videoAwal?.idVideo ?: 0,

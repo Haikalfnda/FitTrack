@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface FitTrackDao {
 
+    // ── USER ──────────────────────────────────────────────────────────────────
+
     @Insert
     suspend fun insertUser(user: UserEntity): Long
 
@@ -24,8 +26,13 @@ interface FitTrackDao {
     @Query("SELECT COUNT(*) FROM users WHERE role = 'admin'")
     suspend fun countAdmin(): Int
 
+    /** Semua user dengan role 'user' (semua status) */
     @Query("SELECT * FROM users WHERE role = 'user'")
     fun getAllUsers(): Flow<List<UserEntity>>
+
+    /** Fitur 2: Hanya user dengan status 'pending' untuk halaman approval admin */
+    @Query("SELECT * FROM users WHERE role = 'user' AND status = 'pending' ORDER BY id_user DESC")
+    fun getPendingUsers(): Flow<List<UserEntity>>
 
     @Query("UPDATE users SET status = :status WHERE id_user = :idUser")
     suspend fun updateUserStatus(idUser: Long, status: String)
@@ -35,6 +42,18 @@ interface FitTrackDao {
 
     @Delete
     suspend fun deleteUser(user: UserEntity)
+
+    @Query("SELECT * FROM users WHERE id_user = :idUser LIMIT 1")
+    fun getUserById(idUser: Long): Flow<UserEntity?>
+
+    /**
+     * Fitur 4: Tandai personalisasi selesai.
+     * Dipanggil setelah user klik "Buat Program Saya" di PersonalizationScreen.
+     */
+    @Query("UPDATE users SET is_personalized = 1 WHERE id_user = :idUser")
+    suspend fun setPersonalized(idUser: Long)
+
+    // ── KONTEN ────────────────────────────────────────────────────────────────
 
     @Insert
     suspend fun insertKonten(konten: KontenEntity): Long
@@ -54,6 +73,8 @@ interface FitTrackDao {
     @Query("SELECT COUNT(*) FROM konten")
     fun countKonten(): Flow<Int>
 
+    // ── VIDEO ─────────────────────────────────────────────────────────────────
+
     @Insert
     suspend fun insertVideo(video: VideoTutorialEntity): Long
 
@@ -67,44 +88,50 @@ interface FitTrackDao {
     fun getAllVideo(): Flow<List<VideoTutorialEntity>>
 
     @Query("""
-    SELECT * FROM video_tutorial
-    WHERE (:kategori = 'Semua' OR kategori = :kategori)
-    ORDER BY id_video DESC""")
+        SELECT * FROM video_tutorial
+        WHERE (:kategori = 'Semua' OR kategori = :kategori)
+        ORDER BY id_video DESC
+    """)
     fun getVideoByKategori(kategori: String): Flow<List<VideoTutorialEntity>>
 
-    @Query("""SELECT * FROM video_tutorial WHERE id_video = :idVideo LIMIT 1""")
-    suspend fun getVideoById(
-        idVideo: Long
-    ): VideoTutorialEntity?
+    @Query("SELECT * FROM video_tutorial WHERE id_video = :idVideo LIMIT 1")
+    suspend fun getVideoById(idVideo: Long): VideoTutorialEntity?
 
     @Query("SELECT COUNT(*) FROM video_tutorial")
     fun countVideo(): Flow<Int>
 
+    // ── STATS ─────────────────────────────────────────────────────────────────
+
     @Query("SELECT COUNT(*) FROM users WHERE role = 'user' AND status = 'aktif'")
     fun countUserAktif(): Flow<Int>
 
-    // Mengambil data berdasarkan filter secara otomatis & real-time
+    /** Fitur 2: Jumlah user pending untuk badge notifikasi di admin dashboard */
+    @Query("SELECT COUNT(*) FROM users WHERE role = 'user' AND status = 'pending'")
+    fun countUserPending(): Flow<Int>
+
+    // ── RIWAYAT LATIHAN ───────────────────────────────────────────────────────
+
     @Query("SELECT * FROM riwayat_latihan WHERE tipeFilter = :filter ORDER BY id DESC")
     fun getRiwayatByFilter(filter: String): Flow<List<RiwayatLatihanEntity>>
 
-    // Dipanggil di akhir sesi latihan user untuk menyimpan data ke database
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRiwayat(riwayat: RiwayatLatihanEntity)
 
-    @Query("SELECT * FROM users WHERE id_user = :idUser LIMIT 1")
-    fun getUserById(idUser: Long): Flow<UserEntity?>
-
-    // 2. Menghitung jumlah latihan mingguan yang sudah selesai
     @Query("SELECT COUNT(*) FROM riwayat_latihan WHERE tipeFilter = 'Mingguan' AND idUser = :idUser")
     fun countLatihanMingguIni(idUser: Long): Flow<Int>
 
-    // 3. Mengupdate data preferensi program ketika klik "Buat program saya"
     @Query("""
         UPDATE users 
         SET level = :level, tujuan = :tujuan, durasi_latihan = :durasi, target_hari_per_minggu = :targetHari 
         WHERE id_user = :idUser
     """)
-    suspend fun updatePersonalisasiUser(idUser: Long, level: String, tujuan: String, durasi: String, targetHari: Int)
+    suspend fun updatePersonalisasiUser(
+        idUser: Long,
+        level: String,
+        tujuan: String,
+        durasi: String,
+        targetHari: Int
+    )
 
     @Query("DELETE FROM riwayat_latihan WHERE idUser = :idUser AND tipeFilter = 'Mingguan'")
     suspend fun deleteRiwayatMingguanUser(idUser: Long)

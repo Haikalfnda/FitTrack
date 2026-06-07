@@ -5,6 +5,15 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Perubahan dari versi sebelumnya:
+ * 1. Field [isPersonalized] ditambahkan → Fitur 4 (skip personalisasi)
+ * 2. Field [status] sekarang mendukung nilai: "pending", "aktif", "rejected", "nonaktif"
+ *    - "pending"  → menunggu persetujuan admin (Fitur 2)
+ *    - "aktif"    → sudah disetujui, bisa login
+ *    - "rejected" → ditolak admin (Fitur 2)
+ *    - "nonaktif" → dinonaktifkan admin (existing)
+ */
 @Entity(
     tableName = "users",
     indices = [
@@ -23,10 +32,7 @@ data class UserEntity(
     @ColumnInfo(name = "tanggal_lahir")
     val tanggalLahir: String = "",
 
-    // Menyimpan pilihan level (Pemula / Menengah / Lanjutan)
     val level: String = "",
-
-    // Menyimpan pilihan tujuan (Turun berat badan / dll)
     val tujuan: String = "",
 
     @ColumnInfo(name = "durasi_latihan")
@@ -36,5 +42,21 @@ data class UserEntity(
     val targetHariPerMinggu: Int = 0,
 
     val role: String = "user",
-    val status: String = "aktif"
+
+    /**
+     * Status akun:
+     * - "pending"  → baru register, menunggu persetujuan admin
+     * - "aktif"    → disetujui admin, dapat mengakses aplikasi
+     * - "rejected" → ditolak admin
+     * - "nonaktif" → dinonaktifkan admin (toggle existing)
+     */
+    val status: String = "pending",
+
+    /**
+     * Fitur 4: Flag apakah user sudah menyelesaikan personalisasi.
+     * Default false → belum personalisasi.
+     * Di-set true setelah klik "Buat Program Saya" di PersonalizationScreen.
+     */
+    @ColumnInfo(name = "is_personalized", defaultValue = "0")
+    val isPersonalized: Boolean = false
 )

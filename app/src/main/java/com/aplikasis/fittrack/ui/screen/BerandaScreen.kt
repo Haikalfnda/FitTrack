@@ -61,6 +61,7 @@ fun BerandaScreen(
     navController: NavController,
     streakHari: Int = 12,
     onLanjutLatihan: () -> Unit = {},
+    onLogoutClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -99,7 +100,8 @@ fun BerandaScreen(
                 streakHari = streakHari,
                 hariSelesai = hariSelesaiDb, // Tetap biarkan menampilkan angka asli (contoh: Target 4/3)
                 hariTarget = hariTargetDb,
-                progressMinggu = progressMingguDb
+                progressMinggu = progressMingguDb,
+                onLogoutClick = onLogoutClick
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -203,7 +205,8 @@ private fun HeaderCard(
     streakHari: Int,
     hariSelesai: Int,
     hariTarget: Int,
-    progressMinggu: Int
+    progressMinggu: Int,
+    onLogoutClick: () -> Unit
 ) {
     var animatedProgress by remember { mutableFloatStateOf(0f) }
     val progress by animateFloatAsState(
@@ -235,13 +238,26 @@ private fun HeaderCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Column {
-                    Text(
-                        text = "Halo, ${namaUser.split(" ").firstOrNull() ?: "User"} 👋",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = Color.White.copy(alpha = 0.85f)
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Halo, ${namaUser.split(" ").firstOrNull() ?: "User"} 👋",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
                         )
-                    )
+
+                        IconButton(
+                            onClick = onLogoutClick,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Text(text = "🚪", fontSize = 16.sp)
+                        }
+                    }
                     Text(
                         text = "Latihan hari ini",
                         style = MaterialTheme.typography.headlineSmall.copy(
