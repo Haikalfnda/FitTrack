@@ -1,37 +1,34 @@
 package com.aplikasis.fittrack.model
 
-/**
- * FITUR 5 - Model Gerakan Workout
- *
- * Menyimpan data satu gerakan beserta:
- * - [kaloriPerRep]: kalori yang terbakar per satu repetisi
- * - [repTarget]: target repetisi untuk sesi ini
- * - [repSelesai]: repetisi yang benar-benar diselesaikan user (diupdate real-time)
- *
- * Kalori dihitung = kaloriPerRep × repSelesai
- * Sehingga jika user berhenti di tengah, kalori tetap akurat.
- */
+enum class TipeGerakan {
+    REPS,
+    DURASI
+}
+
 data class GerakanWorkout(
     val nama: String,
-    val kaloriPerRep: Double,   // kalori per 1 repetisi
+    val kaloriPerRep: Double,
     val set: Int,
-    val repTarget: Int,         // target total repetisi (set × rep per set)
-    val repSelesai: Int = 0,    // diisi saat user input / selesai
+    val repTarget: Int,
+    val repSelesai: Int = 0,
     val istirahat: String? = null,
     val catatan: String? = null,
-    val isSedang: Boolean = false
+    val isSedang: Boolean = false,
+    val tipe: TipeGerakan = TipeGerakan.REPS
 ) {
-    /** Kalori aktual = kalori per rep × rep yang benar-benar selesai */
+
+    val targetPerSet: Int
+        get() = if (set > 0) repTarget / set else repTarget
+
+    val unitLabel: String
+        get() = if (tipe == TipeGerakan.DURASI) "detik" else "reps"
+
     val kaloriTerbakar: Double get() = kaloriPerRep * repSelesai
 
-    /** Label ringkas untuk tampilan */
     val kaloriTerbakarLabel: String get() = "%.2f kcal".format(kaloriTerbakar)
 }
 
-/**
- * Nilai kalori per repetisi untuk setiap jenis gerakan.
- * Tambahkan gerakan baru di sini sesuai kebutuhan.
- */
+
 object KaloriPerRep {
     const val PUSH_UP          = 0.40
     const val SQUAT            = 0.32
@@ -39,12 +36,13 @@ object KaloriPerRep {
     const val JUMPING_JACK     = 0.20
     const val MOUNTAIN_CLIMBER = 0.15
     const val SHOULDER_TAP     = 0.18
-    const val PLANK            = 0.10   // per detik
+    const val PLANK            = 0.10
+    const val WALL_SIT         = 0.09
     const val LUNGE            = 0.28
     const val BURPEE           = 0.50
     const val HIGH_KNEES       = 0.12
 
-    /** Lookup otomatis berdasarkan nama gerakan (case-insensitive). */
+
     fun dari(namaGerakan: String): Double = when {
         namaGerakan.contains("push up", ignoreCase = true)          -> PUSH_UP
         namaGerakan.contains("squat", ignoreCase = true)            -> SQUAT
@@ -53,6 +51,7 @@ object KaloriPerRep {
         namaGerakan.contains("mountain climber", ignoreCase = true) -> MOUNTAIN_CLIMBER
         namaGerakan.contains("shoulder tap", ignoreCase = true)     -> SHOULDER_TAP
         namaGerakan.contains("plank", ignoreCase = true)            -> PLANK
+        namaGerakan.contains("wall sit", ignoreCase = true)         -> WALL_SIT
         namaGerakan.contains("lunge", ignoreCase = true)            -> LUNGE
         namaGerakan.contains("burpee", ignoreCase = true)           -> BURPEE
         namaGerakan.contains("high knees", ignoreCase = true)       -> HIGH_KNEES

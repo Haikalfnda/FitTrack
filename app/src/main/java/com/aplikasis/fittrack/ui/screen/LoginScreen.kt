@@ -233,7 +233,7 @@ fun LoginScreen(
                         } else {
                             scope.launch {
                                 val user = withContext(Dispatchers.IO) {
-                                    dao.login(email.trim(), password.trim())
+                                    dao.login(email.trim().lowercase(), password.trim())
                                 }
 
                                 when {

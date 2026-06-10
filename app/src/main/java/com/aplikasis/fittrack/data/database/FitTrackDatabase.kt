@@ -26,7 +26,7 @@ import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
         VideoTutorialEntity::class,
         RiwayatLatihanEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class FitTrackDatabase : RoomDatabase() {
@@ -45,9 +45,23 @@ abstract class FitTrackDatabase : RoomDatabase() {
          *   Jika ingin semua user lama dianggap sudah personalisasi, ganti DEFAULT 0 → DEFAULT 1.
          */
         private val MIGRATION_6_7 = object : Migration(6, 7) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL(
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
                     "ALTER TABLE users ADD COLUMN is_personalized INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE users ADD COLUMN berat_badan_saat_ini REAL NOT NULL DEFAULT 0.0"
+                )
+                db.execSQL(
+                    "ALTER TABLE users ADD COLUMN target_berat_badan REAL NOT NULL DEFAULT 0.0"
+                )
+                db.execSQL(
+                    "ALTER TABLE users ADD COLUMN arah_target_berat TEXT NOT NULL DEFAULT ''"
                 )
             }
         }
@@ -59,7 +73,7 @@ abstract class FitTrackDatabase : RoomDatabase() {
                     FitTrackDatabase::class.java,
                     "fittrack_database"
                 )
-                    .addMigrations(MIGRATION_6_7)
+                    .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
                     // fallbackToDestructiveMigration() dihapus — data tidak boleh hilang
                     .build()
 

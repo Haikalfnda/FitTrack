@@ -5,7 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import com.aplikasis.fittrack.data.dao.FitTrackDao
 
 class ViewModelFactory(
-    private val dao: FitTrackDao
+    private val dao: FitTrackDao,
+    private val idUser: Long = 0L
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -20,7 +21,7 @@ class ViewModelFactory(
             modelClass.isAssignableFrom(
                 RiwayatLatihanViewModel::class.java
             ) -> {
-                RiwayatLatihanViewModel(dao) as T
+                RiwayatLatihanViewModel(dao, idUser) as T
             }
 
             modelClass.isAssignableFrom(

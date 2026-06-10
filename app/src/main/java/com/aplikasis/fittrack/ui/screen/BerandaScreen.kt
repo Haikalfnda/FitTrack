@@ -3,6 +3,7 @@ package com.aplikasis.fittrack.ui.screen
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,23 +35,14 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aplikasis.fittrack.data.dao.FitTrackDao
+import com.aplikasis.fittrack.data.entity.KontenEntity
 import com.aplikasis.fittrack.data.entity.UserEntity
+import com.aplikasis.fittrack.model.LatihanStats
+import com.aplikasis.fittrack.model.RingkasanLatihan
 import com.aplikasis.fittrack.navigation.Screen
 import com.aplikasis.fittrack.ui.theme.*
 
 // ─── Data Model Ringkasan Cepat ───────────────────────────────────────────────
-private data class RingkasanCepat(
-    val totalReps: Int,
-    val kalori: Int,
-    val durasiJam: Double
-)
-
-private val dummyRingkasan = RingkasanCepat(
-    totalReps = 1280,
-    kalori = 3420,
-    durasiJam = 18.4
-)
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 @Composable
@@ -59,7 +51,6 @@ fun BerandaScreen(
     idUserAktif: Long,             // Parameter Baru untuk identifikasi User
     user: UserEntity,
     navController: NavController,
-    streakHari: Int = 12,
     onLanjutLatihan: () -> Unit = {},
     onLogoutClick: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -68,11 +59,17 @@ fun BerandaScreen(
 
     // 1. Mengamati data user & jumlah latihan riwayat mingguan secara real-time dari Room
     val userLiveState by fitTrackDao.getUserById(idUserAktif).collectAsState(initial = user)
-    val hariSelesaiDb by fitTrackDao.countLatihanMingguIni(idUserAktif).collectAsState(initial = 0)
+    val riwayatUser by fitTrackDao.getRiwayatByUser(idUserAktif).collectAsState(initial = emptyList())
+    val bannerAktif by fitTrackDao.getBannerAktif().collectAsState(initial = emptyList())
+    val tipsAktif by fitTrackDao.getTipsAktif().collectAsState(initial = emptyList())
+    val artikelAktif by fitTrackDao.getArtikelAktif().collectAsState(initial = emptyList())
 
     // 2. Gunakan data objek live state dari database
     val currentUser = userLiveState ?: user
-    val hariTargetDb = currentUser.targetHariPerMinggu
+    val hariTargetDb = currentUser.targetHariPerMinggu.coerceAtLeast(0)
+    val ringkasan = remember(riwayatUser) { LatihanStats.hitungRingkasan(riwayatUser) }
+    val hariSelesaiDb = remember(riwayatUser) { LatihanStats.hitungHariLatihanMingguIni(riwayatUser) }
+    val streakHariDb = remember(riwayatUser) { LatihanStats.hitungStreakSaatIni(riwayatUser) }
 
     // 3. Hitung persentase progres mingguan secara dinamis & kunci maksimal di angka 100
     val progressMingguDb = if (hariTargetDb > 0) {
@@ -80,6 +77,11 @@ fun BerandaScreen(
         hitungPersen.coerceAtMost(100) // Memastikan nilai teks tidak melampaui 100%
     } else {
         0
+    }
+    val statusMinggu = when {
+        hariTargetDb <= 0 -> "Lengkapi personalisasi untuk target mingguan."
+        hariSelesaiDb >= hariTargetDb -> "Target minggu ini tercapai."
+        else -> "${hariTargetDb - hariSelesaiDb} hari latihan lagi untuk target minggu ini."
     }
 
     Scaffold(
@@ -97,10 +99,11 @@ fun BerandaScreen(
             // ── Header (Menggunakan Data Ril DB) ──────────────────────────────────
             HeaderCard(
                 namaUser = currentUser.nama,
-                streakHari = streakHari,
+                streakHari = streakHariDb,
                 hariSelesai = hariSelesaiDb, // Tetap biarkan menampilkan angka asli (contoh: Target 4/3)
                 hariTarget = hariTargetDb,
                 progressMinggu = progressMingguDb,
+                statusMinggu = statusMinggu,
                 onLogoutClick = onLogoutClick
             )
 
@@ -121,16 +124,21 @@ fun BerandaScreen(
 
             // Mengoper variabel real database ke dalam card program aktif
             ProgramAktifCard(
-                namaProgram = "Full Body Beginner",
-                frekuensi = "4 minggu • ${hariTargetDb}x per minggu • Personal",
-                tipeLatihan = "Hari ini: Push up + Squat + Plank",
+                namaProgram = namaProgramBeranda(currentUser),
+                frekuensi = "${targetHariLabel(hariTargetDb)} - ${currentUser.durasiLatihan.ifBlank { "Durasi belum diatur" }} - Personal",
+                tipeLatihan = rekomendasiLatihanHariIni(currentUser.tujuan, currentUser.arahTargetBerat),
                 progressMinggu = progressMingguDb,
-                levelLabel = if (currentUser.level.isNotEmpty()) currentUser.level else "Level Pemula",
-                tujuanLabel = if (currentUser.tujuan.isNotEmpty()) "Goal: ${currentUser.tujuan}" else "Goal: Turun berat balance",
-                nextProgression = "+2 reps",
+                levelLabel = currentUser.level.ifBlank { "Level belum diisi" },
+                tujuanLabel = currentUser.tujuan.takeIf { it.isNotBlank() }?.let { "Goal: $it" } ?: "Goal belum diisi",
+                targetBeratLabel = targetBeratLabel(currentUser),
+                nextProgression = if (progressMingguDb >= 100) "atur target baru" else "+2 reps",
                 onLanjutLatihan = onLanjutLatihan,
                 navController = navController
             )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            BannerKontenSection(banner = bannerAktif.firstOrNull())
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -147,7 +155,20 @@ fun BerandaScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            RingkasanCepatRow(ringkasan = dummyRingkasan)
+            RingkasanCepatRow(ringkasan = ringkasan)
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            TipsHariIniSection(tips = tipsAktif.firstOrNull())
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            ArtikelFitnessSection(
+                artikelList = artikelAktif,
+                onArtikelClick = { artikel ->
+                    navController.navigate(Screen.DetailArtikel.createRoute(artikel.idKonten))
+                }
+            )
 
             Spacer(modifier = Modifier.height(28.dp))
         }
@@ -175,7 +196,7 @@ fun BottomNavigationBar(navController: NavController) {
                 onClick = {
                     if (currentRoute != route) {
                         navController.navigate(route) {
-                            popUpTo(navController.graph.startDestinationId) {
+                            popUpTo(Screen.Beranda.route) {
                                 saveState = true
                             }
                             launchSingleTop = true
@@ -206,6 +227,7 @@ private fun HeaderCard(
     hariSelesai: Int,
     hariTarget: Int,
     progressMinggu: Int,
+    statusMinggu: String,
     onLogoutClick: () -> Unit
 ) {
     var animatedProgress by remember { mutableFloatStateOf(0f) }
@@ -318,7 +340,7 @@ private fun HeaderCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Target $hariSelesai/$hariTarget",
+                    text = if (hariTarget > 0) "Target $hariSelesai/$hariTarget" else "Target belum diatur",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 11.sp
@@ -345,7 +367,7 @@ private fun HeaderCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "minggu 2",
+                text = statusMinggu,
                 style = MaterialTheme.typography.labelSmall.copy(
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 10.sp
@@ -365,6 +387,7 @@ private fun ProgramAktifCard(
     progressMinggu: Int,
     levelLabel: String,
     tujuanLabel: String,
+    targetBeratLabel: String,
     nextProgression: String,
     onLanjutLatihan: () -> Unit,
     navController: NavController // Perbaikan 1: Tipe data ditulis secara eksplisit
@@ -461,9 +484,16 @@ private fun ProgramAktifCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChipLabel(text = levelLabel, color = Color(0xFF6D79FF))
-                ChipLabel(text = tujuanLabel, color = Color(0xFF24C6C2))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChipLabel(text = levelLabel, color = Color(0xFF6D79FF))
+                    ChipLabel(text = tujuanLabel, color = Color(0xFF24C6C2))
+                }
+                if (targetBeratLabel.isNotBlank()) {
+                    Row {
+                        ChipLabel(text = targetBeratLabel, color = Color(0xFFE05A24))
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -520,7 +550,7 @@ private fun ProgramAktifCard(
 
 @Composable
 private fun RingkasanCepatRow(
-    ringkasan: RingkasanCepat = dummyRingkasan // Perbaikan 2: Deklarasi parameter default yang valid
+    ringkasan: RingkasanLatihan
 ) {
     Row(
         modifier = Modifier
@@ -539,15 +569,174 @@ private fun RingkasanCepatRow(
             icon = Icons.Default.Whatshot,
             iconColor = Color(0xFFFF6B35),
             label = "Kalori",
-            value = "%,d".format(ringkasan.kalori),
+            value = "%,d".format(ringkasan.totalKalori),
             modifier = Modifier.weight(1f)
         )
         StatCard(
             icon = Icons.Default.Timer,
             iconColor = Color(0xFF24C6C2),
             label = "Durasi",
-            value = "${ringkasan.durasiJam} jam",
+            value = ringkasan.durasiLabel,
             modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun BannerKontenSection(banner: KontenEntity?) {
+    SectionTitle(text = "Banner Latihan")
+    Spacer(modifier = Modifier.height(10.dp))
+
+    if (banner == null) {
+        EmptyKontenCard(message = "Belum ada banner aktif")
+    } else {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = PrimaryBlue),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Text(
+                    text = banner.judul,
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    lineHeight = 24.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = banner.isi,
+                    color = Color.White.copy(alpha = 0.86f),
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TipsHariIniSection(tips: KontenEntity?) {
+    SectionTitle(text = "Tips Hari Ini")
+    Spacer(modifier = Modifier.height(10.dp))
+
+    if (tips == null) {
+        EmptyKontenCard(message = "Belum ada tips aktif")
+    } else {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = tips.judul,
+                    color = DarkText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = tips.isi,
+                    color = MutedText,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtikelFitnessSection(
+    artikelList: List<KontenEntity>,
+    onArtikelClick: (KontenEntity) -> Unit
+) {
+    SectionTitle(text = "Artikel Fitness")
+    Spacer(modifier = Modifier.height(10.dp))
+
+    if (artikelList.isEmpty()) {
+        EmptyKontenCard(message = "Belum ada artikel fitness")
+    } else {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            artikelList.forEach { artikel ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onArtikelClick(artikel) },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = artikel.judul,
+                            color = DarkText,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = potonganKonten(artikel.isi),
+                            color = MutedText,
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Baca Selengkapnya",
+                            color = PrimaryBlue,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = DarkText,
+            fontSize = 17.sp
+        ),
+        modifier = Modifier.padding(horizontal = 20.dp)
+    )
+}
+
+@Composable
+private fun EmptyKontenCard(message: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Text(
+            text = message,
+            color = MutedText,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(16.dp)
         )
     }
 }
@@ -627,18 +816,71 @@ private fun ChipLabel(text: String, color: Color) {
 
 // ─── Preview ─────────────────────────────────────────────────────────────────
 
+private fun targetHariLabel(targetHari: Int): String {
+    return if (targetHari > 0) {
+        "${targetHari}x per minggu"
+    } else {
+        "Target belum diatur"
+    }
+}
+
+private fun potonganKonten(isi: String, batas: Int = 120): String {
+    val rapi = isi.trim().replace(Regex("\\s+"), " ")
+    return if (rapi.length <= batas) rapi else rapi.take(batas).trimEnd() + "..."
+}
+
+private fun targetBeratLabel(user: UserEntity): String {
+    if (user.beratBadanSaatIni <= 0.0 || user.targetBeratBadan <= 0.0 || user.arahTargetBerat.isBlank()) {
+        return ""
+    }
+
+    val selisih = kotlin.math.abs(user.targetBeratBadan - user.beratBadanSaatIni)
+    val arah = if (user.arahTargetBerat.equals("Menaikkan", ignoreCase = true)) "Naik" else "Turun"
+    return "Target: $arah ${formatBeratKgBeranda(selisih)} kg ke ${formatBeratKgBeranda(user.targetBeratBadan)} kg"
+}
+
+private fun formatBeratKgBeranda(value: Double): String {
+    val formatted = "%.1f".format(java.util.Locale.US, value)
+    return formatted.removeSuffix(".0")
+}
+
+private fun namaProgramBeranda(user: UserEntity): String {
+    val level = user.level.ifBlank { "Personal" }
+    return when {
+        user.arahTargetBerat.equals("Menurunkan", ignoreCase = true) ||
+            user.tujuan.contains("turun", ignoreCase = true) -> "Fat Loss $level"
+        user.arahTargetBerat.equals("Menaikkan", ignoreCase = true) ||
+            user.tujuan.contains("otot", ignoreCase = true) -> "Strength Builder $level"
+        user.tujuan.contains("stamina", ignoreCase = true) -> "Stamina Circuit $level"
+        user.tujuan.contains("kebugaran", ignoreCase = true) -> "Fit Maintenance $level"
+        else -> "Full Body $level"
+    }
+}
+
+private fun rekomendasiLatihanHariIni(tujuan: String, arahTargetBerat: String): String {
+    return when {
+        arahTargetBerat.equals("Menurunkan", ignoreCase = true) ||
+            tujuan.contains("turun", ignoreCase = true) -> "Hari ini: Jumping jack + High knees + Squat"
+        arahTargetBerat.equals("Menaikkan", ignoreCase = true) -> "Hari ini: Squat + Lunge + Push up"
+        tujuan.contains("otot", ignoreCase = true) -> "Hari ini: Push up + Squat + Core"
+        tujuan.contains("stamina", ignoreCase = true) -> "Hari ini: Burpee + Mountain climber"
+        tujuan.contains("kebugaran", ignoreCase = true) -> "Hari ini: Full body ringan"
+        else -> "Hari ini: Push up + Squat + Plank"
+    }
+}
+
 @Preview(showBackground = true, backgroundColor = 0xFFF8FAFD)
 @Composable
 fun BerandaScreenPreview() {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val dbDummy = androidx.room.Room.inMemoryDatabaseBuilder(
+    val previewDb = androidx.room.Room.inMemoryDatabaseBuilder(
         context,
         com.aplikasis.fittrack.data.database.FitTrackDatabase::class.java
     ).build()
 
     FitrackTheme {
         BerandaScreen(
-            fitTrackDao = dbDummy.fitTrackDao(),
+            fitTrackDao = previewDb.fitTrackDao(),
             idUserAktif = 1L,
             user = UserEntity(
                 idUser = 1,
@@ -649,8 +891,7 @@ fun BerandaScreenPreview() {
                 tujuan = "Turun berat badan",
                 targetHariPerMinggu = 3
             ),
-            navController = rememberNavController(),
-            streakHari = 12
+            navController = rememberNavController()
         )
     }
 }

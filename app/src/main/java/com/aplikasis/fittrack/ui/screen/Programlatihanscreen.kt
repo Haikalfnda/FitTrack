@@ -25,9 +25,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aplikasis.fittrack.data.dao.FitTrackDao
+import com.aplikasis.fittrack.data.entity.RiwayatLatihanEntity
+import com.aplikasis.fittrack.data.entity.UserEntity
+import com.aplikasis.fittrack.model.LatihanStats
 import com.aplikasis.fittrack.ui.theme.*
 
-// ─── Data dummy ───────────────────────────────────────────────────────────────
+// ─── Data model program latihan ───────────────────────────────────────────────
 
 private data class HariLatihan(
     val nomor: Int,
@@ -49,51 +53,23 @@ private data class ProgramLatihanData(
     val daftarHari: List<HariLatihan>
 )
 
-private val dummyProgramLatihan = ProgramLatihanData(
-    nama = "Full Body Beginner",
-    mingguSaatIni = 3,
-    totalMinggu = 4,
-    fokus = "Konsistensi + belum berharga",
-    progressPersen = 80,
-    progressionMadness = 80,
-    level = "Level Beginner",
-    daftarHari = listOf(
-        HariLatihan(
-            nomor = 1,
-            judul = "Upper Body",
-            gerakan = "Push up 3x12 • Shoulder tap 10x3 • Plank 45 dtk",
-            status = StatusHari.SELESAI
-        ),
-        HariLatihan(
-            nomor = 2,
-            judul = "Lower Body",
-            gerakan = "Squat 10x8 • Lunge 10x8 • Wall sit 40 dtk",
-            status = StatusHari.SELESAI
-        ),
-        HariLatihan(
-            nomor = 3,
-            judul = "Full Body",
-            gerakan = "Burpee 8x3 • Mountain climber 20x3 • Jumping jack",
-            status = StatusHari.HARI_INI
-        ),
-        HariLatihan(
-            nomor = 4,
-            judul = "Core & Cardio",
-            gerakan = "Sit up 15x3 • Plank 60 dtk • High knees 30 dtk",
-            status = StatusHari.TERJADWAL
-        )
-    )
-)
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun ProgramLatihanScreen(
+    fitTrackDao: FitTrackDao,
+    idUserAktif: Long,
+    user: UserEntity,
     onBackClick: () -> Unit = {},
     onMulaiSesi: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val program = dummyProgramLatihan
+    val userLiveState by fitTrackDao.getUserById(idUserAktif).collectAsState(initial = user)
+    val riwayatUser by fitTrackDao.getRiwayatByUser(idUserAktif).collectAsState(initial = emptyList())
+    val currentUser = userLiveState ?: user
+    val program = remember(currentUser, riwayatUser) {
+        buildProgramLatihan(currentUser, riwayatUser)
+    }
     val scrollState = rememberScrollState()
 
     Column(
@@ -479,6 +455,107 @@ private fun ProgressionBar(
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
+private fun buildProgramLatihan(
+    user: UserEntity,
+    riwayat: List<RiwayatLatihanEntity>
+): ProgramLatihanData {
+    val totalMinggu = 4
+    val targetHari = user.targetHariPerMinggu.takeIf { it > 0 }?.coerceIn(1, 7) ?: 3
+    val sesiSelesaiMingguIni = LatihanStats.filterRiwayat(riwayat, "Mingguan").size.coerceAtMost(targetHari)
+    val totalSesiProgram = (targetHari * totalMinggu).coerceAtLeast(1)
+    val sesiSelesai = riwayat.size.coerceAtMost(totalSesiProgram)
+    val progressProgram = ((sesiSelesai * 100) / totalSesiProgram).coerceIn(0, 100)
+    val progressMinggu = ((sesiSelesaiMingguIni * 100) / targetHari).coerceIn(0, 100)
+    val mingguSaatIni = ((sesiSelesai / targetHari) + 1).coerceIn(1, totalMinggu)
+    val templates = templateHariLatihan(user.tujuan, user.arahTargetBerat)
+
+    return ProgramLatihanData(
+        nama = namaProgram(user.tujuan, user.level, user.arahTargetBerat),
+        mingguSaatIni = mingguSaatIni,
+        totalMinggu = totalMinggu,
+        fokus = fokusProgram(user.tujuan, user.arahTargetBerat),
+        progressPersen = progressProgram,
+        progressionMadness = progressMinggu,
+        level = user.level.takeIf { it.isNotBlank() }?.let { "Level $it" } ?: "Level belum diisi",
+        daftarHari = (1..targetHari).map { nomor ->
+            val template = templates[(nomor - 1) % templates.size]
+            HariLatihan(
+                nomor = nomor,
+                judul = template.first,
+                gerakan = template.second,
+                status = when {
+                    nomor <= sesiSelesaiMingguIni -> StatusHari.SELESAI
+                    nomor == sesiSelesaiMingguIni + 1 -> StatusHari.HARI_INI
+                    else -> StatusHari.TERJADWAL
+                }
+            )
+        }
+    )
+}
+
+private fun namaProgram(tujuan: String, level: String, arahTargetBerat: String): String {
+    val prefix = when {
+        arahTargetBerat.equals("Menurunkan", ignoreCase = true) ||
+            tujuan.contains("turun", ignoreCase = true) -> "Fat Loss"
+        arahTargetBerat.equals("Menaikkan", ignoreCase = true) -> "Strength Builder"
+        tujuan.contains("otot", ignoreCase = true) -> "Strength Builder"
+        tujuan.contains("stamina", ignoreCase = true) -> "Stamina Circuit"
+        tujuan.contains("kebugaran", ignoreCase = true) -> "Fit Maintenance"
+        else -> "Full Body"
+    }
+    val suffix = level.takeIf { it.isNotBlank() } ?: "Personal"
+    return "$prefix $suffix"
+}
+
+private fun fokusProgram(tujuan: String, arahTargetBerat: String): String {
+    if (arahTargetBerat.equals("Menurunkan", ignoreCase = true)) {
+        return "Cardio, pembakaran kalori, dan lower body"
+    }
+    if (arahTargetBerat.equals("Menaikkan", ignoreCase = true)) {
+        return "Strength, lower body, dan pembentukan massa otot"
+    }
+    return tujuan.takeIf { it.isNotBlank() } ?: "Konsistensi dan kebugaran dasar"
+}
+
+private fun templateHariLatihan(tujuan: String, arahTargetBerat: String): List<Pair<String, String>> {
+    val targetTurun = arahTargetBerat.equals("Menurunkan", ignoreCase = true) ||
+        tujuan.contains("turun", ignoreCase = true)
+    val targetNaik = arahTargetBerat.equals("Menaikkan", ignoreCase = true) ||
+        tujuan.contains("otot", ignoreCase = true) ||
+        tujuan.contains("massa", ignoreCase = true)
+
+    return when {
+        targetTurun -> listOf(
+            "Cardio Burn" to "Jumping jack 3x25 - High knees 3x30 dtk - Mountain climber 3x20",
+            "Lower Body Cardio" to "Squat 3x15 - Lunge 3x10 - Wall sit 2x40 dtk",
+            "HIIT Ringan" to "Burpee 3x8 - Jumping jack 3x25 - Plank 45 dtk",
+            "Core & Fat Loss" to "Mountain climber 3x20 - Sit up 3x15 - High knees 3x30 dtk"
+        )
+        targetNaik -> listOf(
+            "Upper Strength" to "Push up 3x12 - Shoulder tap 3x10 - Plank 45 dtk",
+            "Lower Body Strength" to "Squat 4x10 - Lunge 3x10 - Wall sit 2x40 dtk",
+            "Full Body Strength" to "Squat 4x10 - Push up 3x12 - Lunge 3x10",
+            "Core Stabil" to "Plank 60 dtk - Shoulder tap 3x10 - Sit up 3x15"
+        )
+        tujuan.contains("stamina", ignoreCase = true) -> listOf(
+            "Cardio Interval" to "High knees 3x30 dtk - Jumping jack 3x25 - Plank",
+            "Endurance" to "Mountain climber 4x20 - Burpee 3x8 - Squat pulse",
+            "Full Body Circuit" to "Push up 3x10 - Squat 3x12 - High knees"
+        )
+        tujuan.contains("kebugaran", ignoreCase = true) -> listOf(
+            "Full Body Ringan" to "Squat 3x10 - Push up 3x8 - Plank 30 dtk",
+            "Mobilitas" to "Lunge 3x8 - Shoulder tap 3x10 - Stretching",
+            "Core Stabil" to "Sit up 3x12 - Plank 45 dtk - Mountain climber"
+        )
+        else -> listOf(
+            "Upper Body" to "Push up 3x12 - Shoulder tap 3x10 - Plank 45 dtk",
+            "Lower Body" to "Squat 3x12 - Lunge 3x10 - Wall sit 40 dtk",
+            "Full Body" to "Burpee 3x8 - Mountain climber 3x20 - Jumping jack",
+            "Core & Cardio" to "Sit up 3x15 - Plank 60 dtk - High knees 30 dtk"
+        )
+    }
+}
+
 @Composable
 private fun ChipWhite(text: String) {
     Box(
@@ -503,7 +580,26 @@ private fun ChipWhite(text: String) {
 @Preview(showBackground = true, backgroundColor = 0xFFF8FAFD)
 @Composable
 fun ProgramLatihanScreenPreview() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val previewDb = androidx.room.Room.inMemoryDatabaseBuilder(
+        context,
+        com.aplikasis.fittrack.data.database.FitTrackDatabase::class.java
+    ).build()
+
     FitrackTheme {
-        ProgramLatihanScreen()
+        ProgramLatihanScreen(
+            fitTrackDao = previewDb.fitTrackDao(),
+            idUserAktif = 1L,
+            user = UserEntity(
+                idUser = 1L,
+                nama = "Fabio Santoso",
+                email = "fabio@email.com",
+                password = "",
+                level = "Pemula",
+                tujuan = "Turun berat badan",
+                durasiLatihan = "20-30 menit",
+                targetHariPerMinggu = 3
+            )
+        )
     }
 }

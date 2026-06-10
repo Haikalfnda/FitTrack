@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,7 +46,10 @@ fun DataPenggunaScreen(
     )
 
     val hasilCariSemua = daftarUser
-        .filter { it.status != "pending" && it.status != "rejected" }
+        .filter {
+            !it.status.equals("pending", ignoreCase = true) &&
+                    !it.status.equals("rejected", ignoreCase = true)
+        }
         .filter {
             it.nama.contains(keyword, ignoreCase = true) ||
                     it.email.contains(keyword, ignoreCase = true)
@@ -70,7 +75,11 @@ fun DataPenggunaScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Text(text = "‹", style = MaterialTheme.typography.headlineMedium)
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Kembali",
+                            tint = Color(0xFF2563EB)
+                        )
                     }
                 }
             )
@@ -122,7 +131,7 @@ fun DataPenggunaScreen(
                     0 -> {
                         // Tab Semua — tampilan existing
                         if (hasilCariSemua.isEmpty()) {
-                            EmptyStateText("Belum ada pengguna aktif")
+                            EmptyStateText("Belum ada pengguna aktif atau nonaktif")
                         } else {
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 items(hasilCariSemua) { user ->
@@ -187,6 +196,10 @@ fun DataPenggunaScreen(
                     Text(text = "Email: ${userDetail?.email}")
                     Text(text = "Level: ${userDetail?.level.takeIf { it?.isNotBlank() == true } ?: "-"}")
                     Text(text = "Tujuan: ${userDetail?.tujuan.takeIf { it?.isNotBlank() == true } ?: "-"}")
+                    Text(text = "Berat saat ini: ${userDetail?.beratBadanSaatIni?.takeIf { it > 0.0 }?.let { "${formatBeratKgUser(it)} kg" } ?: "-"}")
+                    Text(text = "Target berat: ${targetBeratUserLabel(userDetail)}")
+                    Text(text = "Durasi: ${userDetail?.durasiLatihan.takeIf { it?.isNotBlank() == true } ?: "-"}")
+                    Text(text = "Target: ${userDetail?.targetHariPerMinggu?.takeIf { it > 0 }?.let { "$it hari/minggu" } ?: "-"}")
                     Spacer(modifier = Modifier.height(4.dp))
                     val statusColor = when (userDetail?.status) {
                         "aktif" -> Color(0xFF0FA958)
@@ -414,4 +427,17 @@ private fun EmptyStateText(message: String) {
     ) {
         Text(text = message, color = Color.Gray)
     }
+}
+
+private fun targetBeratUserLabel(user: UserEntity?): String {
+    val data = user ?: return "-"
+    if (data.targetBeratBadan <= 0.0 || data.arahTargetBerat.isBlank()) return "-"
+
+    val arah = if (data.arahTargetBerat.equals("Menaikkan", ignoreCase = true)) "Naik" else "Turun"
+    return "$arah ke ${formatBeratKgUser(data.targetBeratBadan)} kg"
+}
+
+private fun formatBeratKgUser(value: Double): String {
+    val formatted = "%.1f".format(java.util.Locale.US, value)
+    return formatted.removeSuffix(".0")
 }

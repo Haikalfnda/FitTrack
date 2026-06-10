@@ -27,7 +27,19 @@ interface FitTrackDao {
     suspend fun countAdmin(): Int
 
     /** Semua user dengan role 'user' (semua status) */
-    @Query("SELECT * FROM users WHERE role = 'user'")
+    @Query("""
+        SELECT * FROM users
+        WHERE role = 'user'
+        ORDER BY
+            CASE status
+                WHEN 'pending' THEN 0
+                WHEN 'aktif' THEN 1
+                WHEN 'nonaktif' THEN 2
+                WHEN 'rejected' THEN 3
+                ELSE 4
+            END,
+            id_user DESC
+    """)
     fun getAllUsers(): Flow<List<UserEntity>>
 
     /** Fitur 2: Hanya user dengan status 'pending' untuk halaman approval admin */
@@ -67,8 +79,30 @@ interface FitTrackDao {
     @Query("SELECT * FROM konten ORDER BY id_konten DESC")
     fun getAllKonten(): Flow<List<KontenEntity>>
 
+    @Query("""
+        SELECT * FROM konten
+        WHERE kategori = :kategori AND status = 'Aktif'
+        ORDER BY id_konten DESC
+    """)
+    fun getKontenAktifByKategori(kategori: String): Flow<List<KontenEntity>>
+
+    @Query("SELECT * FROM konten WHERE status = 'Aktif' ORDER BY id_konten DESC")
+    fun getAllKontenAktif(): Flow<List<KontenEntity>>
+
+    @Query("SELECT * FROM konten WHERE kategori = 'Banner' AND status = 'Aktif' ORDER BY id_konten DESC")
+    fun getBannerAktif(): Flow<List<KontenEntity>>
+
+    @Query("SELECT * FROM konten WHERE kategori = 'Tips' AND status = 'Aktif' ORDER BY id_konten DESC")
+    fun getTipsAktif(): Flow<List<KontenEntity>>
+
+    @Query("SELECT * FROM konten WHERE kategori = 'Artikel' AND status = 'Aktif' ORDER BY id_konten DESC")
+    fun getArtikelAktif(): Flow<List<KontenEntity>>
+
     @Query("SELECT * FROM konten WHERE id_konten = :idKonten LIMIT 1")
     suspend fun getKontenById(idKonten: Long): KontenEntity?
+
+    @Query("SELECT * FROM konten WHERE id_konten = :idKonten AND status = 'Aktif' LIMIT 1")
+    fun getKontenAktifById(idKonten: Long): Flow<KontenEntity?>
 
     @Query("SELECT COUNT(*) FROM konten")
     fun countKonten(): Flow<Int>
@@ -114,6 +148,12 @@ interface FitTrackDao {
     @Query("SELECT * FROM riwayat_latihan WHERE tipeFilter = :filter ORDER BY id DESC")
     fun getRiwayatByFilter(filter: String): Flow<List<RiwayatLatihanEntity>>
 
+    @Query("SELECT * FROM riwayat_latihan WHERE idUser = :idUser ORDER BY id DESC")
+    fun getRiwayatByUser(idUser: Long): Flow<List<RiwayatLatihanEntity>>
+
+    @Query("SELECT * FROM riwayat_latihan WHERE idUser = :idUser AND tipeFilter = :filter ORDER BY id DESC")
+    fun getRiwayatByUserAndFilter(idUser: Long, filter: String): Flow<List<RiwayatLatihanEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRiwayat(riwayat: RiwayatLatihanEntity)
 
@@ -122,13 +162,22 @@ interface FitTrackDao {
 
     @Query("""
         UPDATE users 
-        SET level = :level, tujuan = :tujuan, durasi_latihan = :durasi, target_hari_per_minggu = :targetHari 
+        SET level = :level,
+            tujuan = :tujuan,
+            berat_badan_saat_ini = :beratBadanSaatIni,
+            target_berat_badan = :targetBeratBadan,
+            arah_target_berat = :arahTargetBerat,
+            durasi_latihan = :durasi,
+            target_hari_per_minggu = :targetHari 
         WHERE id_user = :idUser
     """)
     suspend fun updatePersonalisasiUser(
         idUser: Long,
         level: String,
         tujuan: String,
+        beratBadanSaatIni: Double,
+        targetBeratBadan: Double,
+        arahTargetBerat: String,
         durasi: String,
         targetHari: Int
     )

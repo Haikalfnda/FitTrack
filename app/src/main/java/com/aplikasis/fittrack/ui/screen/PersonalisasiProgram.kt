@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -26,11 +27,15 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,8 +56,11 @@ import com.aplikasis.fittrack.ui.theme.ScreenBg
 import androidx.compose.runtime.rememberCoroutineScope
 import com.aplikasis.fittrack.data.dao.FitTrackDao
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 private val CardBg = Color.White
+private const val TARGET_TURUN = "Menurunkan"
+private const val TARGET_NAIK = "Menaikkan"
 
 private enum class OptionType {
     LEVEL, GOAL, DURATION, DAYS
@@ -63,14 +73,49 @@ fun PersonalizationScreen(
     onBackClick: () -> Unit = {},
     onCreateProgramClick: () -> Unit = {}
 ) {
-    var level by remember { mutableStateOf("Pemula • Menengah • Lanjutan") }
+    var level by remember { mutableStateOf("Pemula") }
     var goal by remember { mutableStateOf("Turun berat badan") }
     var duration by remember { mutableStateOf("20–30 menit") }
     var days by remember { mutableStateOf("3 hari") }
+    var beratBadanSaatIni by remember { mutableStateOf("") }
+    var targetBeratBadan by remember { mutableStateOf("") }
+    var arahTargetBerat by remember { mutableStateOf(TARGET_TURUN) }
+    var showWeightValidation by remember { mutableStateOf(false) }
+    var formInitialized by remember(idUserAktif) { mutableStateOf(false) }
 
     var selectedOption by remember { mutableStateOf<OptionType?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
+    val userSaatIni by fitTrackDao
+        .getUserById(idUserAktif)
+        .collectAsState(initial = null)
+    val kontenProgramAktif by fitTrackDao
+        .getKontenAktifByKategori("Program")
+        .collectAsState(initial = emptyList())
+
+    LaunchedEffect(userSaatIni?.idUser) {
+        val user = userSaatIni ?: return@LaunchedEffect
+        if (!formInitialized) {
+            level = user.level.ifBlank { level }
+            goal = user.tujuan.ifBlank { goal }
+            duration = user.durasiLatihan.ifBlank { duration }
+            days = user.targetHariPerMinggu.takeIf { it > 0 }?.let { "$it hari" } ?: days
+            beratBadanSaatIni = formatBeratInput(user.beratBadanSaatIni)
+            targetBeratBadan = formatBeratInput(user.targetBeratBadan)
+            arahTargetBerat = user.arahTargetBerat.ifBlank {
+                if (goal.contains("otot", ignoreCase = true)) TARGET_NAIK else TARGET_TURUN
+            }
+            formInitialized = true
+        }
+    }
+
+    val beratSaatIniAngka = parseBeratBadan(beratBadanSaatIni)
+    val targetBeratAngka = parseBeratBadan(targetBeratBadan)
+    val pesanValidasiBerat = validasiTargetBerat(
+        beratSaatIni = beratSaatIniAngka,
+        targetBerat = targetBeratAngka,
+        arahTarget = arahTargetBerat
+    )
 
     Column(
         modifier = Modifier
@@ -121,6 +166,35 @@ fun PersonalizationScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            WeightTargetCard(
+                beratBadanSaatIni = beratBadanSaatIni,
+                targetBeratBadan = targetBeratBadan,
+                arahTargetBerat = arahTargetBerat,
+                errorMessage = pesanValidasiBerat,
+                showError = showWeightValidation ||
+                    beratBadanSaatIni.isNotBlank() ||
+                    targetBeratBadan.isNotBlank(),
+                onBeratBadanSaatIniChange = {
+                    beratBadanSaatIni = sanitizeBeratInput(it)
+                    showWeightValidation = false
+                },
+                onTargetBeratBadanChange = {
+                    targetBeratBadan = sanitizeBeratInput(it)
+                    showWeightValidation = false
+                },
+                onArahTargetChange = { pilihan ->
+                    arahTargetBerat = pilihan
+                    showWeightValidation = false
+                    goal = when {
+                        pilihan == TARGET_TURUN && goal == "Menambah massa otot" -> "Turun berat badan"
+                        pilihan == TARGET_NAIK && goal == "Turun berat badan" -> "Menambah massa otot"
+                        else -> goal
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             OptionCard(
                 title = "Durasi latihan",
                 value = duration,
@@ -140,27 +214,36 @@ fun PersonalizationScreen(
             PreviewProgramCard(
                 level = level,
                 goal = goal,
+                beratSaatIni = beratSaatIniAngka,
+                targetBerat = targetBeratAngka,
+                arahTargetBerat = arahTargetBerat,
                 duration = duration,
-                days = days
+                days = days,
+                kontenProgram = kontenProgramAktif.map { konten ->
+                    "${konten.judul} - ${konten.isi}"
+                }
             )
 
             Spacer(modifier = Modifier.height(28.dp))
 
             Button(
                 onClick = {
+                    showWeightValidation = true
+                    if (pesanValidasiBerat != null) return@Button
+
                     // Proses penyimpanan data ke database sebelum navigasi pindah
                     coroutineScope.launch {
                         // Mengambil angka saja dari string days (contoh: "3 hari" -> 3)
                         val targetHariAngka = days.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 0
 
-                        // 1. KUNCI UTAMA: Reset riwayat latihan mingguan yang lama dari database lokal
-                        fitTrackDao.deleteRiwayatMingguanUser(idUserAktif)
-
-                        // 2. Perbarui data preferensi program baru milik user
+                        // Perbarui data preferensi program baru milik user tanpa menghapus riwayat latihan.
                         fitTrackDao.updatePersonalisasiUser(
                             idUser = idUserAktif,
                             level = level,
                             tujuan = goal,
+                            beratBadanSaatIni = beratSaatIniAngka,
+                            targetBeratBadan = targetBeratAngka,
+                            arahTargetBerat = arahTargetBerat,
                             durasi = duration,
                             targetHari = targetHariAngka
                         )
@@ -196,7 +279,14 @@ fun PersonalizationScreen(
             onSelected = { selectedValue ->
                 when (option) {
                     OptionType.LEVEL -> level = selectedValue
-                    OptionType.GOAL -> goal = selectedValue
+                    OptionType.GOAL -> {
+                        goal = selectedValue
+                        arahTargetBerat = when (selectedValue) {
+                            "Turun berat badan" -> TARGET_TURUN
+                            "Menambah massa otot" -> TARGET_NAIK
+                            else -> arahTargetBerat
+                        }
+                    }
                     OptionType.DURATION -> duration = selectedValue
                     OptionType.DAYS -> days = selectedValue
                 }
@@ -304,13 +394,171 @@ private fun OptionCard(
     }
 }
 
+@Composable
+private fun WeightTargetCard(
+    beratBadanSaatIni: String,
+    targetBeratBadan: String,
+    arahTargetBerat: String,
+    errorMessage: String?,
+    showError: Boolean,
+    onBeratBadanSaatIniChange: (String) -> Unit,
+    onTargetBeratBadanChange: (String) -> Unit,
+    onArahTargetChange: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = "Target berat badan",
+                color = DarkText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = beratBadanSaatIni,
+                onValueChange = onBeratBadanSaatIniChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Berat badan saat ini") },
+                suffix = { Text("kg") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = DarkText,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start
+                ),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryBlue,
+                    unfocusedBorderColor = Color(0xFFD7DEE9),
+                    focusedLabelColor = PrimaryBlue,
+                    unfocusedLabelColor = MutedText
+                )
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Arah target",
+                color = MutedText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                WeightDirectionButton(
+                    label = TARGET_TURUN,
+                    selected = arahTargetBerat == TARGET_TURUN,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onArahTargetChange(TARGET_TURUN) }
+                )
+                WeightDirectionButton(
+                    label = TARGET_NAIK,
+                    selected = arahTargetBerat == TARGET_NAIK,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onArahTargetChange(TARGET_NAIK) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = targetBeratBadan,
+                onValueChange = onTargetBeratBadanChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Berat badan target") },
+                suffix = { Text("kg") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                isError = showError && errorMessage != null,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = DarkText,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start
+                ),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryBlue,
+                    unfocusedBorderColor = Color(0xFFD7DEE9),
+                    errorBorderColor = Color(0xFFE53935),
+                    focusedLabelColor = PrimaryBlue,
+                    unfocusedLabelColor = MutedText
+                )
+            )
+
+            if (showError && errorMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = errorMessage,
+                    color = Color(0xFFE53935),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                val ringkasan = ringkasanTargetBerat(
+                    beratSaatIni = parseBeratBadan(beratBadanSaatIni),
+                    targetBerat = parseBeratBadan(targetBeratBadan),
+                    arahTarget = arahTargetBerat
+                )
+                if (ringkasan.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = ringkasan,
+                        color = MutedText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeightDirectionButton(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(42.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (selected) PrimaryBlue else Color(0xFFE8EDF5),
+            contentColor = if (selected) Color.White else DarkText
+        )
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PreviewProgramCard(
     level: String,
     goal: String,
+    beratSaatIni: Double,
+    targetBerat: Double,
+    arahTargetBerat: String,
     duration: String,
-    days: String
+    days: String,
+    kontenProgram: List<String>
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -359,6 +607,22 @@ private fun PreviewProgramCard(
                     textColor = Color(0xFF27A844)
                 )
 
+                if (beratSaatIni > 0.0) {
+                    ProgramChip(
+                        text = "Saat ini ${formatBeratKg(beratSaatIni)} kg",
+                        background = Color(0xFFF1EAFE),
+                        textColor = Color(0xFF7C3AED)
+                    )
+                }
+
+                if (targetBerat > 0.0) {
+                    ProgramChip(
+                        text = "$arahTargetBerat ke ${formatBeratKg(targetBerat)} kg",
+                        background = Color(0xFFFFE7DD),
+                        textColor = Color(0xFFE05A24)
+                    )
+                }
+
                 ProgramChip(
                     text = duration,
                     background = Color(0xFFFFF3C8),
@@ -368,7 +632,7 @@ private fun PreviewProgramCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            val programList = getProgramList(goal)
+            val programList = kontenProgram.takeIf { it.isNotEmpty() } ?: getProgramList(goal)
 
             programList.forEach { item ->
                 Text(
@@ -387,6 +651,20 @@ private fun PreviewProgramCard(
                 color = MutedText,
                 fontSize = 11.sp
             )
+
+            val ringkasanBerat = ringkasanTargetBerat(
+                beratSaatIni = beratSaatIni,
+                targetBerat = targetBerat,
+                arahTarget = arahTargetBerat
+            )
+            if (ringkasanBerat.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = ringkasanBerat,
+                    color = MutedText,
+                    fontSize = 11.sp
+                )
+            }
         }
     }
 }
@@ -411,6 +689,75 @@ private fun ProgramChip(
     }
 }
 
+private fun sanitizeBeratInput(value: String): String {
+    val normalized = value.replace(',', '.')
+    val builder = StringBuilder()
+    var hasDot = false
+
+    normalized.forEach { char ->
+        when {
+            char.isDigit() -> builder.append(char)
+            char == '.' && !hasDot -> {
+                builder.append(char)
+                hasDot = true
+            }
+        }
+    }
+
+    val raw = builder.toString()
+    val parts = raw.split('.', limit = 2)
+    val whole = parts.getOrNull(0).orEmpty().take(3)
+    val decimal = parts.getOrNull(1)?.take(1)
+
+    return when {
+        raw.endsWith(".") && whole.isNotBlank() -> "$whole."
+        decimal != null -> "$whole.$decimal"
+        else -> whole
+    }
+}
+
+private fun parseBeratBadan(value: String): Double {
+    return value.replace(',', '.').toDoubleOrNull() ?: 0.0
+}
+
+private fun validasiTargetBerat(
+    beratSaatIni: Double,
+    targetBerat: Double,
+    arahTarget: String
+): String? {
+    return when {
+        beratSaatIni <= 0.0 -> "Masukkan berat badan saat ini."
+        targetBerat <= 0.0 -> "Masukkan berat badan target."
+        arahTarget == TARGET_TURUN && targetBerat >= beratSaatIni ->
+            "Target menurunkan harus lebih kecil dari berat saat ini."
+        arahTarget == TARGET_NAIK && targetBerat <= beratSaatIni ->
+            "Target menaikkan harus lebih besar dari berat saat ini."
+        else -> null
+    }
+}
+
+private fun ringkasanTargetBerat(
+    beratSaatIni: Double,
+    targetBerat: Double,
+    arahTarget: String
+): String {
+    if (validasiTargetBerat(beratSaatIni, targetBerat, arahTarget) != null) return ""
+
+    val selisih = abs(targetBerat - beratSaatIni)
+    val aksi = if (arahTarget == TARGET_NAIK) "menaikkan" else "menurunkan"
+    return "Target: $aksi ${formatBeratKg(selisih)} kg menuju ${formatBeratKg(targetBerat)} kg."
+}
+
+private fun formatBeratInput(value: Double): String {
+    return if (value > 0.0) formatBeratKg(value) else ""
+}
+
+private fun formatBeratKg(value: Double): String {
+    if (value <= 0.0) return "0"
+    val formatted = "%.1f".format(java.util.Locale.US, value)
+    return formatted.removeSuffix(".0")
+}
+
 @Composable
 private fun ChoiceDialog(
     optionType: OptionType,
@@ -426,8 +773,7 @@ private fun ChoiceDialog(
             options = listOf(
                 "Pemula",
                 "Menengah",
-                "Lanjutan",
-                "Pemula • Menengah • Lanjutan"
+                "Lanjutan"
             )
         }
 
@@ -543,11 +889,11 @@ private fun getProgramList(goal: String): List<String> {
 )
 @Composable
 fun PersonalizationScreenPreview() {
-    // Membuat instance context dummy untuk keperluan preview saja
+    // Membuat instance context untuk preview saja
     val context = androidx.compose.ui.platform.LocalContext.current
 
     // Membuat database instan di memori agar preview tidak error
-    val dbDummy = androidx.room.Room.inMemoryDatabaseBuilder(
+    val previewDb = androidx.room.Room.inMemoryDatabaseBuilder(
         context,
         com.aplikasis.fittrack.data.database.FitTrackDatabase::class.java
     ).build()
@@ -559,7 +905,7 @@ fun PersonalizationScreenPreview() {
         )
     ) {
         PersonalizationScreen(
-            fitTrackDao = dbDummy.fitTrackDao(),
+            fitTrackDao = previewDb.fitTrackDao(),
             idUserAktif = 1L
         )
     }

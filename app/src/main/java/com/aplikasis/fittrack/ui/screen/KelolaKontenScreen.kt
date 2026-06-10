@@ -2,6 +2,7 @@ package com.aplikasis.fittrack.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -23,6 +27,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -68,6 +73,7 @@ fun KelolaKontenScreen(
 
     val daftarKonten by dao.getAllKonten().collectAsState(initial = emptyList())
 
+    val kategoriKonten = listOf("Banner", "Artikel", "Tips", "Program")
     var kategoriDipilih by rememberSaveable { mutableStateOf("Banner") }
     var kontenHapus by remember { mutableStateOf<KontenEntity?>(null) }
 
@@ -89,11 +95,10 @@ fun KelolaKontenScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
-                            Text(
-                                text = "‹",
-                                color = PrimaryBlue,
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Bold
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Kembali",
+                                tint = PrimaryBlue
                             )
                         }
                     },
@@ -123,25 +128,18 @@ fun KelolaKontenScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                KategoriChip(
-                    text = "Banner",
-                    selected = kategoriDipilih == "Banner",
-                    onClick = { kategoriDipilih = "Banner" }
-                )
-
-                KategoriChip(
-                    text = "Artikel",
-                    selected = kategoriDipilih == "Artikel",
-                    onClick = { kategoriDipilih = "Artikel" }
-                )
-
-                KategoriChip(
-                    text = "Tips",
-                    selected = kategoriDipilih == "Tips",
-                    onClick = { kategoriDipilih = "Tips" }
-                )
+                kategoriKonten.forEach { kategori ->
+                    KategoriChip(
+                        text = kategori,
+                        selected = kategoriDipilih == kategori,
+                        onClick = { kategoriDipilih = kategori }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(18.dp))
@@ -296,6 +294,15 @@ private fun KontenItemCard(
                     color = Color(0xFF111827),
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = konten.isi.ifBlank { "Belum ada isi konten" },
+                    color = Color(0xFF6B7280),
+                    fontSize = 12.sp,
+                    maxLines = 2
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))

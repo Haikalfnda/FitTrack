@@ -95,7 +95,6 @@ fun NavGraph(navController: NavHostController) {
                     idUserAktif = user.idUser,
                     user = user,
                     navController = navController,
-                    streakHari = 12,
                     onLanjutLatihan = { navController.navigate(Screen.ProgramLatihan.route) },
                     onLogoutClick = {
                         loggedInUser = null
@@ -107,18 +106,62 @@ fun NavGraph(navController: NavHostController) {
             }
         }
 
-        composable(Screen.ProgramLatihan.route) {
-            ProgramLatihanScreen(
-                onBackClick = { navController.popBackStack() },
-                onMulaiSesi = { navController.navigate(Screen.DetailProgram.route) }
+        composable(
+            route = Screen.DetailArtikel.route,
+            arguments = listOf(navArgument("idKonten") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val context = LocalContext.current
+            val dao = remember { FitTrackDatabase.getDatabase(context).fitTrackDao() }
+            val idKonten = backStackEntry.arguments?.getLong("idKonten") ?: 0L
+            DetailArtikelScreen(
+                fitTrackDao = dao,
+                idKonten = idKonten,
+                onBackClick = { navController.popBackStack() }
             )
+        }
+
+        composable(Screen.ProgramLatihan.route) {
+            val user = loggedInUser
+            if (user != null) {
+                val context = LocalContext.current
+                val dao = FitTrackDatabase.getDatabase(context).fitTrackDao()
+                ProgramLatihanScreen(
+                    fitTrackDao = dao,
+                    idUserAktif = user.idUser,
+                    user = user,
+                    onBackClick = { navController.popBackStack() },
+                    onMulaiSesi = { navController.navigate(Screen.DetailProgram.route) }
+                )
+            }
         }
 
         // ── Detail Program ────────────────────────────────────────────────────
         composable(Screen.DetailProgram.route) {
             val context = LocalContext.current
+            val dao = remember { FitTrackDatabase.getDatabase(context).fitTrackDao() }
+            val tipsAktif by dao.getTipsAktif().collectAsState(initial = emptyList())
+            val user = loggedInUser
+            val levelLatihan = user?.level?.takeIf { it.isNotBlank() } ?: "Pemula"
+            val fokusLatihan = user?.tujuan?.takeIf { it.isNotBlank() } ?: "Full body dan core"
+            val arahTargetBerat = user?.arahTargetBerat.orEmpty()
+            val namaProgram = when {
+                arahTargetBerat.equals("Menurunkan", ignoreCase = true) ||
+                    fokusLatihan.contains("turun", ignoreCase = true) -> "Fat Loss $levelLatihan"
+                arahTargetBerat.equals("Menaikkan", ignoreCase = true) -> "Strength Builder $levelLatihan"
+                fokusLatihan.contains("otot", ignoreCase = true) -> "Strength Builder $levelLatihan"
+                fokusLatihan.contains("stamina", ignoreCase = true) -> "Stamina Circuit $levelLatihan"
+                fokusLatihan.contains("kebugaran", ignoreCase = true) -> "Fit Maintenance $levelLatihan"
+                else -> "Full Body $levelLatihan"
+            }
             DetailProgramScreen(
+                namaProgram = namaProgram,
+                hariLatihan = "Sesi hari ini",
+                fokusLatihan = fokusLatihan,
+                levelLatihan = levelLatihan,
+                arahTargetBerat = arahTargetBerat,
+                tipsSebelumLatihan = tipsAktif.firstOrNull(),
                 onBackClick = { navController.popBackStack() },
+                onPlayTutorial = { navController.navigate(Screen.VideoTutorial.route) },
                 onSelesaiSesi = { hasil ->
                     hasilSesiTerakhir = hasil
                     coroutineScope.launch {
@@ -127,13 +170,16 @@ fun NavGraph(navController: NavHostController) {
                         dao.insertRiwayat(
                             RiwayatLatihanEntity(
                                 idUser = loggedInUser?.idUser ?: 0L,
-                                namaProgram = "Full Body Beginner",
+                                namaProgram = hasil.namaProgram,
                                 tanggal = tanggal,
-                                durasi = "25 menit",
+                                durasi = hasil.durasiLabel,
                                 reps = "${hasil.totalRep} reps",
                                 kalori = "%.1f kcal".format(hasil.totalKalori),
                                 detail = hasil.detailGerakan.joinToString(", ") {
-                                    "${it.nama}: ${it.repSelesai}/${it.repTarget} rep"
+                                    val setDetail = it.setLabel.takeIf { label -> label.isNotBlank() }
+                                        ?.let { label -> " ($label)" }
+                                        ?: ""
+                                    "${it.nama}: ${it.progressLabel}$setDetail"
                                 },
                                 tipeFilter = "Mingguan"
                             )
@@ -154,7 +200,11 @@ fun NavGraph(navController: NavHostController) {
         }
 
         composable(Screen.ProgressTracking.route) {
+            val context = LocalContext.current
+            val dao = FitTrackDatabase.getDatabase(context).fitTrackDao()
             ProgressTrackingScreen(
+                fitTrackDao = dao,
+                idUserAktif = loggedInUser?.idUser ?: 0L,
                 onBerandaClick = {
                     navController.navigate(Screen.Beranda.route) {
                         popUpTo(Screen.Beranda.route) { inclusive = false }
@@ -168,7 +218,9 @@ fun NavGraph(navController: NavHostController) {
         composable(Screen.RiwayatLatihan.route) {
             val context = LocalContext.current
             val dao = FitTrackDatabase.getDatabase(context).fitTrackDao()
-            val riwayatViewModel: RiwayatLatihanViewModel = viewModel(factory = ViewModelFactory(dao))
+            val riwayatViewModel: RiwayatLatihanViewModel = viewModel(
+                factory = ViewModelFactory(dao, loggedInUser?.idUser ?: 0L)
+            )
             RiwayatLatihanScreen(navController = navController, viewModel = riwayatViewModel)
         }
 
@@ -221,7 +273,11 @@ fun NavGraph(navController: NavHostController) {
             arguments = listOf(navArgument("idKonten") { type = NavType.LongType; defaultValue = 0L })
         ) { backStackEntry ->
             val idKonten = backStackEntry.arguments?.getLong("idKonten") ?: 0L
-            FormKontenScreen(idKonten = idKonten, onBackClick = { navController.popBackStack() })
+            FormKontenScreen(
+                idKonten = idKonten,
+                onBackClick = { navController.popBackStack() },
+                onSaved = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.KelolaVideo.route) {

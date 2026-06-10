@@ -31,16 +31,7 @@ private val yangTersimpan = listOf(
     "Status target harian & streak"
 )
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
 
-/**
- * FITUR 5 - Perubahan RingkasanSesiScreen:
- * - Parameter [hasilSesi] menggantikan data dummy.
- * - Menampilkan detail per gerakan: nama, rep selesai/target, kalori.
- * - Total reps & kalori dari data real sesi.
- * - [hasilSesi] bisa null (fallback ke tampilan default jika dipanggil
- *   dari tempat lain tanpa data sesi).
- */
 @Composable
 fun RingkasanSesiScreen(
     hasilSesi: HasilSesi? = null,
@@ -70,6 +61,11 @@ fun RingkasanSesiScreen(
             MiniStatCard(
                 label = "Reps",
                 value = "${hasilSesi?.totalRep ?: 0}",
+                modifier = Modifier.weight(1f)
+            )
+            MiniStatCard(
+                label = "Durasi",
+                value = hasilSesi?.durasiLabel ?: "0 detik",
                 modifier = Modifier.weight(1f)
             )
             MiniStatCard(
@@ -125,7 +121,7 @@ fun RingkasanSesiScreen(
                         )
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "${hasilSesi.totalRep} rep",
+                                text = "${hasilSesi.totalRep} reps - ${hasilSesi.durasiLabel}",
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = DarkText
@@ -323,12 +319,22 @@ private fun GerakanRingkasanRow(detail: DetailGerakan) {
                 )
             )
             Text(
-                text = "${detail.repSelesai} / ${detail.repTarget} rep",
+                text = detail.progressLabel,
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = MutedText,
                     fontSize = 11.sp
                 )
             )
+            if (detail.setLabel.isNotBlank()) {
+                Text(
+                    text = detail.setLabel,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = MutedText,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp
+                    )
+                )
+            }
         }
 
         Column(horizontalAlignment = Alignment.End) {
@@ -343,7 +349,7 @@ private fun GerakanRingkasanRow(detail: DetailGerakan) {
             // Badge selesai/tidak
             if (detail.repSelesai >= detail.repTarget) {
                 Text(
-                    text = "✓ Target",
+                    text = "Target",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = Color(0xFF22C55E),
                         fontSize = 10.sp,

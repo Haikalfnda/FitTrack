@@ -27,42 +27,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aplikasis.fittrack.data.dao.FitTrackDao
+import com.aplikasis.fittrack.model.LatihanStats
 import com.aplikasis.fittrack.ui.theme.*
 
-// ─── Data dummy ───────────────────────────────────────────────────────────────
-
-private data class ProgressData(
-    val trenRep: List<Int>,          // 6 minggu
-    val persenNaik: Int,
-    val rataRataReps: Int,
-    val diffVsMingguLalu: Int,
-    val kaloriTerbakar: Int,
-    val statusKalori: String,
-    val frekuensiPerMinggu: Int,
-    val statusFrekuensi: String
-)
-
-private val dummyProgress = ProgressData(
-    trenRep = listOf(60, 72, 80, 88, 95, 110),
-    persenNaik = 34,
-    rataRataReps = 118,
-    diffVsMingguLalu = 12,
-    kaloriTerbakar = 2840,
-    statusKalori = "Stabil",
-    frekuensiPerMinggu = 4,
-    statusFrekuensi = "Sangat konsisten"
-)
+// ─── Screen ──────────────────────────────────────────────────────────────────
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 @Composable
 fun ProgressTrackingScreen(
+    fitTrackDao: FitTrackDao,
+    idUserAktif: Long,
     onBerandaClick: () -> Unit = {},
     onRiwayatClick: () -> Unit = {},
     onVideoClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val data = dummyProgress
+    val riwayatUser by fitTrackDao.getRiwayatByUser(idUserAktif).collectAsState(initial = emptyList())
+    val user by fitTrackDao.getUserById(idUserAktif).collectAsState(initial = null)
+    val data = remember(riwayatUser, user?.targetHariPerMinggu) {
+        LatihanStats.hitungProgress(
+            riwayat = riwayatUser,
+            targetHariPerMinggu = user?.targetHariPerMinggu ?: 0
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -108,7 +97,8 @@ fun ProgressTrackingScreen(
             // ── Grafik Tren ──────────────────────────────────────────────────
             TrenRepCard(
                 data = data.trenRep,
-                persenNaik = data.persenNaik
+                persenNaik = data.persenNaik,
+                hasData = data.hasData
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -117,7 +107,7 @@ fun ProgressTrackingScreen(
             StatInfoCard(
                 judul = "Rata-rata reps",
                 nilai = "${data.rataRataReps} reps minggu ini",
-                badge = "+${data.diffVsMingguLalu} vs minggu lalu",
+                badge = formatDiffMingguLalu(data.diffVsMingguLalu, data.hasData),
                 badgeColor = PrimaryBlue
             )
 
@@ -125,7 +115,7 @@ fun ProgressTrackingScreen(
 
             StatInfoCard(
                 judul = "Kalori terbakar",
-                nilai = "${"%,d".format(data.kaloriTerbakar)} estimasi otomatis",
+                nilai = "${"%,d".format(data.kaloriTerbakar)} kcal minggu ini",
                 badge = data.statusKalori,
                 badgeColor = Color(0xFFF59E0B)
             )
@@ -168,7 +158,7 @@ fun ProgressTrackingScreen(
 // ─── Grafik Tren Rep ──────────────────────────────────────────────────────────
 
 @Composable
-private fun TrenRepCard(data: List<Int>, persenNaik: Int) {
+private fun TrenRepCard(data: List<Int>, persenNaik: Int, hasData: Boolean) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,7 +187,7 @@ private fun TrenRepCard(data: List<Int>, persenNaik: Int) {
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "+$persenNaik%",
+                        text = formatPersenNaik(persenNaik, hasData),
                         style = MaterialTheme.typography.labelSmall.copy(
                             color = Color(0xFF16A34A),
                             fontWeight = FontWeight.Bold
@@ -416,10 +406,36 @@ fun BottomNavBar(
 
 // ─── Preview ─────────────────────────────────────────────────────────────────
 
+private fun formatPersenNaik(persen: Int, hasData: Boolean): String {
+    if (!hasData) return "0%"
+    return when {
+        persen > 0 -> "+$persen%"
+        else -> "$persen%"
+    }
+}
+
+private fun formatDiffMingguLalu(diff: Int, hasData: Boolean): String {
+    if (!hasData) return "Belum ada data"
+    return when {
+        diff > 0 -> "+$diff vs minggu lalu"
+        diff < 0 -> "$diff vs minggu lalu"
+        else -> "Sama dengan minggu lalu"
+    }
+}
+
 @Preview(showBackground = true, backgroundColor = 0xFFF8FAFD)
 @Composable
 fun ProgressTrackingScreenPreview() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val previewDb = androidx.room.Room.inMemoryDatabaseBuilder(
+        context,
+        com.aplikasis.fittrack.data.database.FitTrackDatabase::class.java
+    ).build()
+
     FitrackTheme {
-        ProgressTrackingScreen()
+        ProgressTrackingScreen(
+            fitTrackDao = previewDb.fitTrackDao(),
+            idUserAktif = 1L
+        )
     }
 }

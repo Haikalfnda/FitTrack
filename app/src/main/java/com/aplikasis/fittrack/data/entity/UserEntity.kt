@@ -35,6 +35,15 @@ data class UserEntity(
     val level: String = "",
     val tujuan: String = "",
 
+    @ColumnInfo(name = "berat_badan_saat_ini", defaultValue = "0.0")
+    val beratBadanSaatIni: Double = 0.0,
+
+    @ColumnInfo(name = "target_berat_badan", defaultValue = "0.0")
+    val targetBeratBadan: Double = 0.0,
+
+    @ColumnInfo(name = "arah_target_berat", defaultValue = "''")
+    val arahTargetBerat: String = "",
+
     @ColumnInfo(name = "durasi_latihan")
     val durasiLatihan: String = "",
 

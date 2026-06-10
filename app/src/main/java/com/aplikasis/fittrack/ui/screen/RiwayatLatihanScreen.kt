@@ -32,6 +32,7 @@ fun RiwayatLatihanScreen(
     // Ambil state filter dan data list langsung dari database secara real-time
     val selectedFilter by viewModel.selectedFilter.collectAsState()
     val dataRiwayat by viewModel.dataRiwayatState.collectAsState()
+    var detailRiwayat by remember { mutableStateOf<RiwayatLatihanEntity?>(null) }
 
     Scaffold(
         containerColor = Color(0xFFF5F7FB),
@@ -124,16 +125,34 @@ fun RiwayatLatihanScreen(
                     items(dataRiwayat) { item ->
                         RiwayatCard(
                             item = item,
-                            onDetailClick = {
-                                navController.navigate(
-                                    "detail_riwayat/${item.namaProgram}/${item.tanggal}/${item.durasi}/${item.reps}/${item.kalori}/${item.detail}"
-                                )
-                            }
+                            onDetailClick = { detailRiwayat = item }
                         )
                     }
                 }
             }
         }
+    }
+
+    detailRiwayat?.let { item ->
+        AlertDialog(
+            onDismissRequest = { detailRiwayat = null },
+            title = { Text(text = item.namaProgram, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(text = "Tanggal: ${item.tanggal}")
+                    Text(text = "Durasi: ${item.durasi}")
+                    Text(text = "Reps: ${item.reps}")
+                    Text(text = "Kalori: ${item.kalori}")
+                    HorizontalDivider()
+                    Text(text = item.detail.ifBlank { "Belum ada detail gerakan." })
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { detailRiwayat = null }) {
+                    Text(text = "Tutup")
+                }
+            }
+        )
     }
 }
 

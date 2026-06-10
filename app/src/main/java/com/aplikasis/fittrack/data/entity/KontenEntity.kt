@@ -16,5 +16,5 @@ data class KontenEntity(
 
     val isi: String,
 
-    val status: String = "Draft"
+    val status: String = "Nonaktif"
 )
