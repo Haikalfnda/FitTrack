@@ -1,95 +1,93 @@
 package com.aplikasis.fittrack.utils
 
-/**
- * Utility untuk menangani URL YouTube.
- *
- * FITUR 1 - Tambahan:
- * - [toEmbedUrl]: konversi URL YouTube biasa ke format embed
- * - [isYoutubeUrl]: deteksi apakah URL adalah YouTube
- *
- * Format URL YouTube yang didukung:
- *   https://www.youtube.com/watch?v=VIDEO_ID
- *   https://youtu.be/VIDEO_ID
- *   https://www.youtube.com/shorts/VIDEO_ID
- *   https://www.youtube.com/embed/VIDEO_ID (sudah embed, langsung pakai)
- */
-object YoutubeUtils {
+import java.net.URLEncoder
 
-    /**
-     * Ekstrak video ID dari berbagai format URL YouTube.
-     * Return null jika bukan URL YouTube atau format tidak dikenali.
-     */
+object YoutubeUtils {
+    private const val EMBED_ORIGIN = "https://fittrack.local"
+
     fun extractVideoId(url: String): String? {
+        val cleanUrl = url.trim()
+        val lowerUrl = cleanUrl.lowercase()
+
         return try {
             when {
-                // Format: youtu.be/VIDEO_ID
-                url.contains("youtu.be/") -> {
-                    url.substringAfter("youtu.be/")
+                lowerUrl.contains("youtu.be/") -> {
+                    cleanUrl.substringAfterMarker("youtu.be/")
                         .substringBefore("?")
                         .substringBefore("&")
+                        .substringBefore("/")
                         .trim()
                 }
 
-                // Format: youtube.com/watch?v=VIDEO_ID
-                url.contains("youtube.com/watch") -> {
-                    val queryString = url.substringAfter("?")
-                    queryString.split("&")
-                        .firstOrNull { it.startsWith("v=") }
+                lowerUrl.contains("youtube.com/watch") -> {
+                    cleanUrl.substringAfter("?")
+                        .split("&")
+                        .firstOrNull { it.startsWith("v=", ignoreCase = true) }
                         ?.substringAfter("v=")
                         ?.substringBefore("&")
                         ?.trim()
                 }
 
-                // Format: youtube.com/shorts/VIDEO_ID
-                url.contains("youtube.com/shorts/") -> {
-                    url.substringAfter("youtube.com/shorts/")
+                lowerUrl.contains("youtube.com/shorts/") -> {
+                    cleanUrl.substringAfterMarker("youtube.com/shorts/")
                         .substringBefore("?")
                         .substringBefore("/")
                         .trim()
                 }
 
-                // Sudah embed: youtube.com/embed/VIDEO_ID
-                url.contains("youtube.com/embed/") -> {
-                    url.substringAfter("youtube.com/embed/")
+                lowerUrl.contains("youtube.com/live/") -> {
+                    cleanUrl.substringAfterMarker("youtube.com/live/")
+                        .substringBefore("?")
+                        .substringBefore("/")
+                        .trim()
+                }
+
+                lowerUrl.contains("youtube.com/embed/") -> {
+                    cleanUrl.substringAfterMarker("youtube.com/embed/")
+                        .substringBefore("?")
+                        .substringBefore("/")
+                        .trim()
+                }
+
+                lowerUrl.contains("youtube-nocookie.com/embed/") -> {
+                    cleanUrl.substringAfterMarker("youtube-nocookie.com/embed/")
                         .substringBefore("?")
                         .substringBefore("/")
                         .trim()
                 }
 
                 else -> null
-            }
+            }?.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             null
         }
     }
 
-    /**
-     * Konversi URL YouTube apa pun ke format embed URL.
-     * Jika sudah embed atau bukan YouTube → kembalikan URL asli.
-     */
     fun toEmbedUrl(url: String): String {
-        val videoId = extractVideoId(url) ?: return url
-        // ?rel=0 → nonaktifkan suggested videos; ?modestbranding=1 → kurangi branding
-        return "https://www.youtube.com/embed/$videoId?rel=0&modestbranding=1"
+        val videoId = extractVideoId(url) ?: return url.trim()
+        val origin = URLEncoder.encode(EMBED_ORIGIN, "UTF-8")
+        return "https://www.youtube-nocookie.com/embed/$videoId" +
+            "?autoplay=1&playsinline=1&fs=1&rel=0&modestbranding=1&enablejsapi=1&origin=$origin"
     }
 
-    /**
-     * Cek apakah URL adalah YouTube (termasuk youtu.be dan berbagai format).
-     */
     fun isYoutubeUrl(url: String): Boolean {
-        return url.contains("youtube.com") || url.contains("youtu.be")
+        val cleanUrl = url.trim().lowercase()
+        return cleanUrl.contains("youtube.com") ||
+            cleanUrl.contains("youtube-nocookie.com") ||
+            cleanUrl.contains("youtu.be")
     }
 
-    /**
-     * Existing function — dipertahankan untuk kompatibilitas dengan VideoTutorialScreen.
-     * Mengambil thumbnail YouTube dari video URL.
-     */
     fun getYoutubeThumbnail(url: String): String {
         val videoId = extractVideoId(url)
         return if (videoId != null) {
             "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
         } else {
-            url // Fallback ke URL asli jika bukan YouTube
+            url
         }
+    }
+
+    private fun String.substringAfterMarker(marker: String): String {
+        val index = indexOf(marker, ignoreCase = true)
+        return if (index >= 0) substring(index + marker.length) else this
     }
 }

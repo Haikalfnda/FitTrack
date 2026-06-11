@@ -1,6 +1,7 @@
 package com.aplikasis.fittrack.ui.screen
 
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -198,22 +199,45 @@ fun EmbeddedVideoPlayer(
             """.trimIndent()
         }
     }
+    val contentKey = remember(embedUrl, htmlContent, isYoutube) {
+        if (isYoutube) embedUrl else htmlContent
+    }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewRef?.apply {
+                stopLoading()
+                loadUrl("about:blank")
+                clearHistory()
+                removeAllViews()
+                destroy()
+            }
+        }
+    }
 
     AndroidView(
         modifier = modifier,
         factory = { context ->
             WebView(context).apply {
+                webViewRef = this
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
+                setBackgroundColor(android.graphics.Color.BLACK)
+                CookieManager.getInstance().setAcceptCookie(true)
+                CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
+                    databaseEnabled = true
                     mediaPlaybackRequiresUserGesture = false
                     loadWithOverviewMode = true
                     useWideViewPort = true
+                    loadsImagesAutomatically = true
+                    cacheMode = WebSettings.LOAD_DEFAULT
                     javaScriptCanOpenWindowsAutomatically = false
                     setSupportMultipleWindows(false)
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -225,30 +249,36 @@ fun EmbeddedVideoPlayer(
                 // WebChromeClient dibutuhkan untuk fullscreen YouTube
                 webChromeClient = WebChromeClient()
 
-                tag = htmlContent
-                loadDataWithBaseURL(
-                    "https://www.youtube.com",
-                    htmlContent,
-                    "text/html",
-                    "UTF-8",
-                    null
-                )
+                tag = contentKey
+                loadFitTrackVideo(isYoutube, embedUrl, htmlContent)
             }
         },
         update = { webView ->
             // Hanya reload jika konten berubah (misal videoId beda)
-            if (webView.tag != htmlContent) {
-                webView.tag = htmlContent
-                webView.loadDataWithBaseURL(
-                    "https://www.youtube.com",
-                    htmlContent,
-                    "text/html",
-                    "UTF-8",
-                    null
-                )
+            if (webView.tag != contentKey) {
+                webView.tag = contentKey
+                webView.loadFitTrackVideo(isYoutube, embedUrl, htmlContent)
             }
         }
     )
+}
+
+private fun WebView.loadFitTrackVideo(
+    isYoutube: Boolean,
+    embedUrl: String,
+    htmlContent: String
+) {
+    if (isYoutube) {
+        loadUrl(embedUrl)
+    } else {
+        loadDataWithBaseURL(
+            "https://fittrack.local",
+            htmlContent,
+            "text/html",
+            "UTF-8",
+            null
+        )
+    }
 }
 
 private class FitTrackVideoWebViewClient(
@@ -276,7 +306,11 @@ private class FitTrackVideoWebViewClient(
         if (!isYoutube) return false
 
         val isPlayerUrl = url.contains("youtube.com/embed/") ||
-            url.contains("youtube-nocookie.com/embed/")
+            url.contains("youtube-nocookie.com/embed/") ||
+            url.contains("youtube.com/watch") ||
+            url.contains("m.youtube.com/watch") ||
+            url.contains("youtube.com/shorts/") ||
+            url.contains("youtu.be/")
 
         return !isPlayerUrl
     }

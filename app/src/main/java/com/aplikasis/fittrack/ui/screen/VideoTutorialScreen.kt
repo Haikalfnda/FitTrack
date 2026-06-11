@@ -34,12 +34,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.aplikasis.fittrack.data.entity.VideoTutorialEntity
 import com.aplikasis.fittrack.utils.YoutubeUtils.getYoutubeThumbnail
@@ -58,8 +61,8 @@ fun VideoTutorialScreen(
     var kategoriDipilih by remember {
         mutableStateOf("Semua")
     }
-    var videoDiputarId by remember {
-        mutableStateOf<Long?>(null)
+    var videoDiputar by remember {
+        mutableStateOf<VideoTutorialEntity?>(null)
     }
 
     val videoFiltered = when (kategoriDipilih) {
@@ -78,7 +81,7 @@ fun VideoTutorialScreen(
     }
 
     LaunchedEffect(initialGerakan, daftarVideo) {
-        if (!initialGerakan.isNullOrBlank() && daftarVideo.isNotEmpty() && videoDiputarId == null) {
+        if (!initialGerakan.isNullOrBlank() && daftarVideo.isNotEmpty() && videoDiputar == null) {
             val kataKunci = initialGerakan.trim()
             val videoGerakan = daftarVideo.firstOrNull { video ->
                 video.judul.contains(kataKunci, ignoreCase = true) ||
@@ -87,7 +90,7 @@ fun VideoTutorialScreen(
             } ?: daftarVideo.first()
 
             kategoriDipilih = "Semua"
-            videoDiputarId = videoGerakan.idVideo
+            videoDiputar = videoGerakan
         }
     }
 
@@ -159,27 +162,31 @@ fun VideoTutorialScreen(
                     items = videoFiltered,
                     key = { it.idVideo }
                 ) { video ->
-                    val sedangDiputar = videoDiputarId == video.idVideo
+                    val sedangDiputar = videoDiputar?.idVideo == video.idVideo
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         VideoUserCard(
                             video = video,
                             isPlaying = sedangDiputar,
                             onClick = {
-                                videoDiputarId = if (sedangDiputar) null else video.idVideo
+                                videoDiputar = if (sedangDiputar) null else video
                             }
                         )
-
-                        if (sedangDiputar) {
-                            InlineVideoPlayerCard(
-                                video = video,
-                                onOpenDetail = { onVideoClick(video) }
-                            )
-                        }
                     }
                 }
             }
         }
+    }
+
+    videoDiputar?.let { video ->
+        VideoPlayerDialog(
+            video = video,
+            onDismiss = { videoDiputar = null },
+            onOpenDetail = {
+                videoDiputar = null
+                onVideoClick(video)
+            }
+        )
     }
 }
 @Composable
@@ -251,56 +258,87 @@ private fun VideoUserCard(
 }
 
 @Composable
-private fun InlineVideoPlayerCard(
+private fun VideoPlayerDialog(
     video: VideoTutorialEntity,
+    onDismiss: () -> Unit,
     onOpenDetail: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column {
-            Box(
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.86f))
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(210.dp)
-                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .background(Color.Black)
+                    .clip(RoundedCornerShape(24.dp)),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1220))
             ) {
-                EmbeddedVideoPlayer(
-                    url = video.videoUrl,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(230.dp)
+                            .background(Color.Black)
+                    ) {
+                        EmbeddedVideoPlayer(
+                            url = video.videoUrl,
+                            modifier = Modifier.fillMaxSize()
+                        )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = video.judul,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF111827),
-                        maxLines = 1
-                    )
-                    Text(
-                        text = "Player terbuka langsung di aplikasi",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
-                    )
-                }
+                        TextButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .background(
+                                    color = Color.Black.copy(alpha = 0.58f),
+                                    shape = RoundedCornerShape(50)
+                                )
+                        ) {
+                            Text(
+                                text = "Tutup",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
-                TextButton(onClick = onOpenDetail) {
-                    Text(
-                        text = "Detail",
-                        color = Color(0xFF2563EB),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = video.judul,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 2
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Video diputar langsung di aplikasi FitTrack.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.72f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = onOpenDetail) {
+                                Text(
+                                    text = "Detail",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
