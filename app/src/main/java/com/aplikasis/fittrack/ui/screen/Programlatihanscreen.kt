@@ -40,7 +40,7 @@ private data class HariLatihan(
     val status: StatusHari  // Selesai, HariIni, Terjadwal
 )
 
-private enum class StatusHari { SELESAI, HARI_INI, TERJADWAL }
+private enum class StatusHari { SELESAI, HARI_INI, TERJADWAL, BONUS }
 
 private data class ProgramLatihanData(
     val nama: String,
@@ -143,7 +143,11 @@ fun ProgramLatihanScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Progression minggu depan otomatis naik jika target tercapai.",
+                text = if (program.progressionMadness >= 100) {
+                    "Target minggu ini terpenuhi. Sesi berikutnya menjadi latihan bonus dan program akan berulang minggu depan."
+                } else {
+                    "Progression minggu depan otomatis naik jika target tercapai."
+                },
                 style = MaterialTheme.typography.labelSmall.copy(
                     color = MutedText,
                     fontSize = 10.sp
@@ -172,7 +176,7 @@ fun ProgramLatihanScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
             ) {
                 Text(
-                    text = "Mulai sesi hari ini",
+                    text = if (program.progressionMadness >= 100) "" else "Mulai sesi hari ini",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -273,6 +277,7 @@ private fun HeaderProgramCard(program: ProgramLatihanData) {
 @Composable
 private fun HariCard(hari: HariLatihan) {
     val isHariIni = hari.status == StatusHari.HARI_INI
+    val isBonus = hari.status == StatusHari.BONUS
     val isSelesai = hari.status == StatusHari.SELESAI
     val isTerjadwal = hari.status == StatusHari.TERJADWAL
 
@@ -281,17 +286,21 @@ private fun HariCard(hari: HariLatihan) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
             .then(
-                if (isHariIni) Modifier.border(
+                if (isHariIni || isBonus) Modifier.border(
                     width = 1.5.dp,
-                    color = PrimaryBlue,
+                    color = if (isBonus) Color(0xFF27A844) else PrimaryBlue,
                     shape = RoundedCornerShape(14.dp)
                 ) else Modifier
             ),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isHariIni) Color(0xFFF0F5FF) else Color.White
+            containerColor = when {
+                isBonus -> Color(0xFFEAF8E6)
+                isHariIni -> Color(0xFFF0F5FF)
+                else -> Color.White
+            }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isHariIni) 3.dp else 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHariIni || isBonus) 3.dp else 1.dp)
     ) {
         Row(
             modifier = Modifier
@@ -307,6 +316,7 @@ private fun HariCard(hari: HariLatihan) {
                     .background(
                         when {
                             isSelesai -> Color(0xFF22C55E)
+                            isBonus -> Color(0xFF27A844)
                             isHariIni -> PrimaryBlue
                             else -> BorderColor
                         }
@@ -327,7 +337,7 @@ private fun HariCard(hari: HariLatihan) {
                         modifier = Modifier.size(16.dp)
                     )
                     else -> Text(
-                        text = "${hari.nomor}",
+                        text = if (isBonus) "+" else "${hari.nomor}",
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -364,6 +374,21 @@ private fun HariCard(hari: HariLatihan) {
 
             // Badge status
             when {
+                isBonus -> Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFF27A844))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "Bonus",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    )
+                }
                 isHariIni -> Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
@@ -461,7 +486,10 @@ private fun buildProgramLatihan(
 ): ProgramLatihanData {
     val totalMinggu = 4
     val targetHari = user.targetHariPerMinggu.takeIf { it > 0 }?.coerceIn(1, 7) ?: 3
-    val sesiSelesaiMingguIni = LatihanStats.filterRiwayat(riwayat, "Mingguan").size.coerceAtMost(targetHari)
+    val jumlahSesiMingguIni = LatihanStats.filterRiwayat(riwayat, "Mingguan").size
+    val sesiSelesaiMingguIni = jumlahSesiMingguIni.coerceAtMost(targetHari)
+    val targetMingguanTerpenuhi = jumlahSesiMingguIni >= targetHari
+    val nomorHariBonus = ((jumlahSesiMingguIni - targetHari).coerceAtLeast(0) % targetHari) + 1
     val totalSesiProgram = (targetHari * totalMinggu).coerceAtLeast(1)
     val sesiSelesai = riwayat.size.coerceAtMost(totalSesiProgram)
     val progressProgram = ((sesiSelesai * 100) / totalSesiProgram).coerceIn(0, 100)
@@ -484,6 +512,7 @@ private fun buildProgramLatihan(
                 judul = template.first,
                 gerakan = template.second,
                 status = when {
+                    targetMingguanTerpenuhi && nomor == nomorHariBonus -> StatusHari.BONUS
                     nomor <= sesiSelesaiMingguIni -> StatusHari.SELESAI
                     nomor == sesiSelesaiMingguIni + 1 -> StatusHari.HARI_INI
                     else -> StatusHari.TERJADWAL

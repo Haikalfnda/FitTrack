@@ -179,6 +179,7 @@ fun BerandaScreen(
 fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val currentTopLevelRoute = currentRoute?.substringBefore("?")
 
     NavigationBar(
         containerColor = Color.White,
@@ -192,13 +193,10 @@ fun BottomNavigationBar(navController: NavController) {
         )
         items.forEach { (label, route, icon) ->
             NavigationBarItem(
-                selected = currentRoute == route,
+                selected = currentTopLevelRoute == route,
                 onClick = {
-                    if (currentRoute != route) {
+                    if (currentTopLevelRoute != route) {
                         navController.navigate(route) {
-                            popUpTo(Screen.Beranda.route) {
-                                saveState = true
-                            }
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -392,6 +390,8 @@ private fun ProgramAktifCard(
     onLanjutLatihan: () -> Unit,
     navController: NavController // Perbaikan 1: Tipe data ditulis secara eksplisit
 ) {
+    val targetTerpenuhi = progressMinggu >= 100
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -441,13 +441,17 @@ private fun ProgramAktifCard(
                     .fillMaxWidth()
                     .height(6.dp)
                     .clip(RoundedCornerShape(3.dp)),
-                color = if (progressMinggu >= 100) Color(0xFF27A844) else PrimaryBlue,
+                color = if (targetTerpenuhi) Color(0xFF27A844) else PrimaryBlue,
                 trackColor = BorderColor,
                 strokeCap = StrokeCap.Round
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Progression minggu depan otomatis naik jika target tercapai.",
+                text = if (targetTerpenuhi) {
+                    "Target mingguan selesai. Lihat progres, atur target baru, atau ambil sesi bonus."
+                } else {
+                    "Progression minggu depan otomatis naik jika target tercapai."
+                },
                 style = MaterialTheme.typography.labelSmall.copy(
                     color = MutedText,
                     fontSize = 10.sp
@@ -498,48 +502,44 @@ private fun ProgramAktifCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Next progression: $nextProgression",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        color = MutedText,
-                        fontSize = 11.sp
-                    )
+            if (targetTerpenuhi) {
+                TargetTerpenuhiActions(
+                    navController = navController,
+                    onLatihanBonus = onLanjutLatihan
                 )
-
-                // Mengatur sifat klik tombol secara dinamis berdasarkan nilai progress
-                Button(
-                    onClick = {
-                        if (progressMinggu >= 100) {
-                            navController.navigate(Screen.Personalization.route) {
-                                popUpTo(Screen.Beranda.route) { inclusive = false }
-                            }
-                        } else {
-                            onLanjutLatihan()
-                        }
-                    },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (progressMinggu >= 100) Color(0xFF27A844) else PrimaryBlue
-                    ),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (progressMinggu >= 100) "Latihan Baru" else "Lanjut latihan",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.SemiBold
+                        text = "Next progression: $nextProgression",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MutedText,
+                            fontSize = 11.sp
                         )
                     )
+
+                    Button(
+                        onClick = onLanjutLatihan,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Lanjut latihan",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -547,6 +547,78 @@ private fun ProgramAktifCard(
 }
 
 // ─── Ringkasan Cepat ──────────────────────────────────────────────────────────
+
+@Composable
+private fun TargetTerpenuhiActions(
+    navController: NavController,
+    onLatihanBonus: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "Target minggu ini sudah penuh.",
+            color = Color(0xFF27A844),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Button(
+            onClick = {
+                navController.navigate(Screen.ProgressTracking.route) {
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF27A844)),
+            contentPadding = PaddingValues(vertical = 10.dp)
+        ) {
+            Text(
+                text = "Lihat Progress",
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    navController.navigate(Screen.Personalization.route) {
+                        popUpTo(Screen.Beranda.route) { inclusive = false }
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                contentPadding = PaddingValues(vertical = 9.dp)
+            ) {
+                Text(
+                    text = "Atur Target Baru",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+            }
+
+            Button(
+                onClick = onLatihanBonus,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8EDF5)),
+                contentPadding = PaddingValues(vertical = 9.dp)
+            ) {
+                Text(
+                    text = "Latihan Bonus",
+                    color = DarkText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun RingkasanCepatRow(

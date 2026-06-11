@@ -1,5 +1,6 @@
 package com.aplikasis.fittrack.navigation
 
+import android.content.Context
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -23,11 +24,25 @@ import java.util.Locale
 @Composable
 fun NavGraph(navController: NavHostController) {
 
+    val appContext = LocalContext.current.applicationContext
     var loggedInUser by remember { mutableStateOf<UserEntity?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
     // FITUR 5: State untuk meneruskan hasil sesi ke RingkasanSesiScreen
     var hasilSesiTerakhir by remember { mutableStateOf<HasilSesi?>(null) }
+
+    LaunchedEffect(Unit) {
+        val savedUser = withContext(Dispatchers.IO) {
+            restoreSavedSession(appContext)
+        }
+        if (savedUser != null && loggedInUser == null) {
+            loggedInUser = savedUser
+            navController.navigate(destinationForUser(savedUser)) {
+                popUpTo(Screen.Welcome.route) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -42,17 +57,11 @@ fun NavGraph(navController: NavHostController) {
             LoginScreen(
                 onRegisterClick = { navController.navigate(Screen.Register.route) },
                 onLoginSuccess = { user ->
+                    saveSession(appContext, user)
                     loggedInUser = user
-                    when {
-                        user.role == "admin" -> navController.navigate(Screen.AdminDashboard.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
-                        }
-                        user.isPersonalized -> navController.navigate(Screen.Beranda.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
-                        }
-                        else -> navController.navigate(Screen.Personalization.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
-                        }
+                    navController.navigate(destinationForUser(user)) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -77,6 +86,7 @@ fun NavGraph(navController: NavHostController) {
                     coroutineScope.launch {
                         withContext(Dispatchers.IO) { dao.setPersonalized(idUserAktif) }
                         loggedInUser = loggedInUser?.copy(isPersonalized = true)
+                        loggedInUser?.let { saveSession(appContext, it) }
                         navController.navigate(Screen.Beranda.route) {
                             popUpTo(Screen.Personalization.route) { inclusive = true }
                         }
@@ -97,6 +107,7 @@ fun NavGraph(navController: NavHostController) {
                     navController = navController,
                     onLanjutLatihan = { navController.navigate(Screen.ProgramLatihan.route) },
                     onLogoutClick = {
+                        clearSession(appContext)
                         loggedInUser = null
                         navController.navigate(Screen.Login.route) {
                             popUpTo(Screen.Welcome.route) { inclusive = false }
@@ -161,7 +172,11 @@ fun NavGraph(navController: NavHostController) {
                 arahTargetBerat = arahTargetBerat,
                 tipsSebelumLatihan = tipsAktif.firstOrNull(),
                 onBackClick = { navController.popBackStack() },
-                onPlayTutorial = { navController.navigate(Screen.VideoTutorial.route) },
+                onPlayTutorial = { gerakan ->
+                    navController.navigate(Screen.VideoTutorial.createRoute(gerakan)) {
+                        launchSingleTop = true
+                    }
+                },
                 onSelesaiSesi = { hasil ->
                     hasilSesiTerakhir = hasil
                     coroutineScope.launch {
@@ -207,11 +222,22 @@ fun NavGraph(navController: NavHostController) {
                 idUserAktif = loggedInUser?.idUser ?: 0L,
                 onBerandaClick = {
                     navController.navigate(Screen.Beranda.route) {
-                        popUpTo(Screen.Beranda.route) { inclusive = false }
+                        launchSingleTop = true
+                        restoreState = true
                     }
                 },
-                onRiwayatClick = { navController.navigate(Screen.RiwayatLatihan.route) },
-                onVideoClick = { navController.navigate(Screen.VideoTutorial.route) }
+                onRiwayatClick = {
+                    navController.navigate(Screen.RiwayatLatihan.route) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                onVideoClick = {
+                    navController.navigate(Screen.VideoTutorial.route) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
             )
         }
 
@@ -224,12 +250,23 @@ fun NavGraph(navController: NavHostController) {
             RiwayatLatihanScreen(navController = navController, viewModel = riwayatViewModel)
         }
 
-        composable(Screen.VideoTutorial.route) {
+        composable(
+            route = Screen.VideoTutorial.routeWithGerakan,
+            arguments = listOf(
+                navArgument(Screen.VideoTutorial.argGerakan) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
             val context = LocalContext.current
             val dao = remember { FitTrackDatabase.getDatabase(context).fitTrackDao() }
             val videoViewModel: VideoTutorialViewModel = viewModel(factory = ViewModelFactory(dao))
+            val gerakanAwal = backStackEntry.arguments?.getString(Screen.VideoTutorial.argGerakan)
             VideoTutorialScreen(
                 viewModel = videoViewModel,
+                initialGerakan = gerakanAwal,
                 onBackClick = { navController.popBackStack() },
                 onVideoClick = { video -> navController.navigate(Screen.DetailVideo.createRoute(video.idVideo)) }
             )
@@ -252,6 +289,7 @@ fun NavGraph(navController: NavHostController) {
                 onKelolaVideoClick = { navController.navigate(Screen.KelolaVideo.route) },
                 onDataPenggunaClick = { navController.navigate(Screen.DataPengguna.route) },
                 onLogoutClick = {
+                    clearSession(appContext)
                     loggedInUser = null
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Welcome.route) { inclusive = false }
@@ -287,5 +325,52 @@ fun NavGraph(navController: NavHostController) {
         composable(Screen.DataPengguna.route) {
             DataPenggunaScreen(onBackClick = { navController.popBackStack() })
         }
+    }
+}
+
+private const val SESSION_PREF = "fittrack_session"
+private const val KEY_USER_ID = "user_id"
+
+private suspend fun restoreSavedSession(context: Context): UserEntity? {
+    val savedId = context
+        .getSharedPreferences(SESSION_PREF, Context.MODE_PRIVATE)
+        .getLong(KEY_USER_ID, 0L)
+
+    if (savedId <= 0L) return null
+
+    val dao = FitTrackDatabase.getDatabase(context).fitTrackDao()
+    val user = dao.getUserByIdOnce(savedId)
+
+    return if (user != null && user.status.equals("aktif", ignoreCase = true)) {
+        user
+    } else {
+        clearSession(context)
+        null
+    }
+}
+
+private fun saveSession(context: Context, user: UserEntity) {
+    if (!user.status.equals("aktif", ignoreCase = true)) return
+
+    context
+        .getSharedPreferences(SESSION_PREF, Context.MODE_PRIVATE)
+        .edit()
+        .putLong(KEY_USER_ID, user.idUser)
+        .apply()
+}
+
+private fun clearSession(context: Context) {
+    context
+        .getSharedPreferences(SESSION_PREF, Context.MODE_PRIVATE)
+        .edit()
+        .clear()
+        .apply()
+}
+
+private fun destinationForUser(user: UserEntity): String {
+    return when {
+        user.role == "admin" -> Screen.AdminDashboard.route
+        user.isPersonalized -> Screen.Beranda.route
+        else -> Screen.Personalization.route
     }
 }

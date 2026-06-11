@@ -2,6 +2,7 @@ package com.aplikasis.fittrack.ui.screen
 
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -213,15 +214,18 @@ fun EmbeddedVideoPlayer(
                     mediaPlaybackRequiresUserGesture = false
                     loadWithOverviewMode = true
                     useWideViewPort = true
+                    javaScriptCanOpenWindowsAutomatically = false
+                    setSupportMultipleWindows(false)
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
 
-                // Agar link di dalam iframe tidak membuka browser eksternal
-                webViewClient = WebViewClient()
+                // Agar interaksi video tetap di player aplikasi, bukan membuka browser eksternal.
+                webViewClient = FitTrackVideoWebViewClient(isYoutube)
 
                 // WebChromeClient dibutuhkan untuk fullscreen YouTube
                 webChromeClient = WebChromeClient()
 
+                tag = htmlContent
                 loadDataWithBaseURL(
                     "https://www.youtube.com",
                     htmlContent,
@@ -233,13 +237,47 @@ fun EmbeddedVideoPlayer(
         },
         update = { webView ->
             // Hanya reload jika konten berubah (misal videoId beda)
-            webView.loadDataWithBaseURL(
-                "https://www.youtube.com",
-                htmlContent,
-                "text/html",
-                "UTF-8",
-                null
-            )
+            if (webView.tag != htmlContent) {
+                webView.tag = htmlContent
+                webView.loadDataWithBaseURL(
+                    "https://www.youtube.com",
+                    htmlContent,
+                    "text/html",
+                    "UTF-8",
+                    null
+                )
+            }
         }
     )
+}
+
+private class FitTrackVideoWebViewClient(
+    private val isYoutube: Boolean
+) : WebViewClient() {
+
+    override fun shouldOverrideUrlLoading(
+        view: WebView?,
+        request: WebResourceRequest?
+    ): Boolean {
+        if (request?.isForMainFrame == false) return false
+        return shouldBlockNavigation(request?.url?.toString().orEmpty())
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+        return shouldBlockNavigation(url.orEmpty())
+    }
+
+    private fun shouldBlockNavigation(targetUrl: String): Boolean {
+        val url = targetUrl.lowercase()
+        if (url.isBlank() || url.startsWith("about:blank") || url.startsWith("data:")) {
+            return false
+        }
+        if (!isYoutube) return false
+
+        val isPlayerUrl = url.contains("youtube.com/embed/") ||
+            url.contains("youtube-nocookie.com/embed/")
+
+        return !isPlayerUrl
+    }
 }

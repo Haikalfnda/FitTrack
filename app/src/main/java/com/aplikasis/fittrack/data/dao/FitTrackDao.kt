@@ -58,6 +58,9 @@ interface FitTrackDao {
     @Query("SELECT * FROM users WHERE id_user = :idUser LIMIT 1")
     fun getUserById(idUser: Long): Flow<UserEntity?>
 
+    @Query("SELECT * FROM users WHERE id_user = :idUser LIMIT 1")
+    suspend fun getUserByIdOnce(idUser: Long): UserEntity?
+
     /**
      * Fitur 4: Tandai personalisasi selesai.
      * Dipanggil setelah user klik "Buat Program Saya" di PersonalizationScreen.

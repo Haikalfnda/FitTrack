@@ -74,6 +74,7 @@ abstract class FitTrackDatabase : RoomDatabase() {
                     "fittrack_database"
                 )
                     .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
+                    .fallbackToDestructiveMigrationFrom(true, 1, 2, 3, 4, 5)
                     // fallbackToDestructiveMigration() dihapus — data tidak boleh hilang
                     .build()
 
