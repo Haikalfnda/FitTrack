@@ -41,10 +41,12 @@ import com.aplikasis.fittrack.model.LatihanStats
 import com.aplikasis.fittrack.model.RingkasanLatihan
 import com.aplikasis.fittrack.navigation.Screen
 import com.aplikasis.fittrack.ui.theme.*
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material3.ExperimentalMaterial3Api
 
 // ─── Data Model Ringkasan Cepat ───────────────────────────────────────────────
 // ─── Screen ───────────────────────────────────────────────────────────────────
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BerandaScreen(
     fitTrackDao: FitTrackDao,      // Parameter Baru untuk akses DB
@@ -86,6 +88,29 @@ fun BerandaScreen(
 
     Scaffold(
         containerColor = ScreenBg,
+
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "FitTrack",
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                actions = {
+                    IconButton(
+                        onClick = onLogoutClick
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Logout,
+                            contentDescription = "Logout",
+                            tint = Color.Red
+                        )
+                    }
+                }
+            )
+        },
+
         bottomBar = {
             BottomNavigationBar(navController = navController)
         }
@@ -103,8 +128,7 @@ fun BerandaScreen(
                 hariSelesai = hariSelesaiDb, // Tetap biarkan menampilkan angka asli (contoh: Target 4/3)
                 hariTarget = hariTargetDb,
                 progressMinggu = progressMingguDb,
-                statusMinggu = statusMinggu,
-                onLogoutClick = onLogoutClick
+                statusMinggu = statusMinggu
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -225,8 +249,7 @@ private fun HeaderCard(
     hariSelesai: Int,
     hariTarget: Int,
     progressMinggu: Int,
-    statusMinggu: String,
-    onLogoutClick: () -> Unit
+    statusMinggu: String
 ) {
     var animatedProgress by remember { mutableFloatStateOf(0f) }
     val progress by animateFloatAsState(
@@ -270,13 +293,6 @@ private fun HeaderCard(
                                 color = Color.White.copy(alpha = 0.85f)
                             )
                         )
-
-                        IconButton(
-                            onClick = onLogoutClick,
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Text(text = "🚪", fontSize = 16.sp)
-                        }
                     }
                     Text(
                         text = "Latihan hari ini",
